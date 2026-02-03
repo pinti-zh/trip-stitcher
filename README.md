@@ -41,10 +41,10 @@ pip install --upgrade pip
 pip install git+https://gitlab.com/ocsept/ocsept.git@develop
 ```
 
-**5. Install the project:**
+**5. Install dependencies:**
 
 ```
-pip install .
+pip install -r requirements.txt
 ```
 
 ## Usage
