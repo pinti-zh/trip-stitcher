@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 wheels/
+lib/
 *.egg-info
 
 # Virtual environments
@@ -12,6 +13,8 @@ wheels/
 # Data
 data/
 *.db
+*.sqlite
+output/
 
 # Pycharm
 .idea

@@ -5,7 +5,22 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "contextily>=1.7.0",
     "loguru>=0.7.3",
+    "matplotlib>=3.10.8",
+    "networkx>=3.6.1",
+    "ocsept",
     "pandas>=2.3.3",
-    "sqlalchemy>=2.0.45",
+    "polyline>=2.0.4",
+    "pyarrow>=22.0.0",
+    "pydantic>=1.10.26",
+    "pyvis>=0.3.2",
+    "requests>=2.32.5",
+    "requests-cache>=1.2.1",
+    "seaborn>=0.13.2",
+    "sqlalchemy[mypy]>=2.0.45",
+    "tqdm>=4.67.1",
 ]
+
+[tool.uv.sources]
+ocsept = { git = "https://gitlab.com/ocsept/ocsept.git", rev = "develop" }
