@@ -60,7 +60,14 @@ Windows (Powershell):
 .\venv\Scripts\Activate.ps1
 ```
 
-**2. Read the GTFS data into a database:**
+**2. [Optional] Create data and output directories:**
+
+```
+mkdir data
+mkdir output
+```
+
+**3. Read the GTFS data into a database:**
 
 This step assumes that you have a directory containing
 all the .txt files of the GTFS dataset.
@@ -73,7 +80,7 @@ This can take a few minutes.
 
 After successful execution of the script the data is stored in a database for faster access.
 
-**3. Extract relevant information into a parquet file:**
+**4. Extract relevant information into a parquet file:**
 
 Chose a destination for the relevant data, for example `data/postauto.parquet`.
 
@@ -81,7 +88,7 @@ Chose a destination for the relevant data, for example `data/postauto.parquet`.
 python build_postauto_dataset.py --query-output-file <your-destination>
 ```
 
-**4. Extract trips and estimate energy demands:**
+**5. Extract trips and estimate energy demands:**
 
 To extract the trips and calculate the energy demands we use three scripts:
 1. `trips.py`: Extracts trips from a .parquet file.
