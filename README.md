@@ -95,3 +95,5 @@ python trips.py --file data/postauto.parquet | head -n 8| python osrm.py | pytho
 ```
 
 This will estimate the energy demand of the first 8 trips extracted from `data/postauto.parquet`.
+
+**Warning:** Since `osrm.py` is using public APIs, an internet connection is required to run the script.
