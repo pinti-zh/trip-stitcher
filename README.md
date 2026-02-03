@@ -69,6 +69,8 @@ all the .txt files of the GTFS dataset.
 python db_creation.py --gtfs-directory <your-gtfs-directory> 
 ```
 
+This can take a few minutes.
+
 After successful execution of the script the data is stored in a database for faster access.
 
 **3. Extract relevant information into a parquet file:**
