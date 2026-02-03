@@ -94,6 +94,6 @@ All scripts output structured JSON Lines to stdout and log to stderr. This means
 python trips.py --file data/postauto.parquet | head -n 8| python osrm.py | python energy_demand.py --bus-type mini > output/energy_demands.jsonl
 ```
 
-This will estimate the energy demand of the first 8 trips extracted from `data/postauto.parquet`.
+This will estimate the energy demand of the first 8 trips extracted from `data/postauto.parquet` and write the output to `output/energy_demands.jsonl`.
 
 **Warning:** Since `osrm.py` is using public APIs, an internet connection is required to run the script.
