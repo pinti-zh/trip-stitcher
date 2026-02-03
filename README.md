@@ -88,9 +88,7 @@ To extract the trips and calculate the energy demands we use three scripts:
 2. `osrm.py`: Augments trips with routing and elevation data.
 3. `energy_demand.py`: Estimates energy demands of the trips. 
 
-All scripts output in structured json-lines to stdout and log to stderr.
-This means you can specify output files or pipe the scripts into one another, and combine with unix commands.
-For example, you can run:
+All scripts output structured JSON Lines to stdout and log to stderr. This means you can specify output files or pipe the scripts to one another, and combine them with Unix commands. For example, you can run:
 
 ```
 python trips.py --file data/postauto.parquet | head -n 8| python osrm.py | python energy_demand.py --bus-type mini > output/energy_demands.jsonl
