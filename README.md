@@ -11,7 +11,7 @@ This installation assumes the use of *venv*.
 **1. Clone the repository:**
 
 ```
-git clone <repo_url> 
+git clone git@github.com:pinti-zh/trip-stitcher.git
 cd trip-stitcher
 ```
 
