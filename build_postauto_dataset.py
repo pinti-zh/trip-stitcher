@@ -1,8 +1,10 @@
 import sys
 from argparse import ArgumentParser
+from datetime import date
 from pathlib import Path
 from time import perf_counter
 
+import Levenshtein
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -16,6 +18,7 @@ def main():
     parser.add_argument("--db-name", type=str, dest="db_name", default="gtfs")
     parser.add_argument("--query-output-file", type=str, dest="query_output_file")
     parser.add_argument("--chunk-size", type=int, dest="chunk_size", default=100000)
+    parser.add_argument("--agency", type=str, dest="agency", default="801", help="agency id or name")
     args = parser.parse_args()
 
     if not args.debug:
@@ -26,15 +29,79 @@ def main():
     logger.debug(f"created engine for {args.db_name}.db")
     metadata = MetaData()
 
-    agency_id = 801 # PostAuto AG
+    weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    target_date = "20250113"
+    year, month, day = map(int, [target_date[:4], target_date[4:6], target_date[6:]])
+    target_date_object = date(year, month, day)
+    weekday = target_date_object.weekday()
+    logger.debug(f"target date: {target_date_object} ({weekdays[weekday]})")
 
     metadata.reflect(engine)
+
+    agency = metadata.tables["agency"]
+    agency_stmt = select(agency.c.agency_id, agency.c.agency_name)
+    agency_id_to_name = {}
+    agency_name_to_id = {}
+    with engine.connect() as conn:
+        for result in conn.execute(agency_stmt):
+            agency_id_to_name[result.agency_id] = result.agency_name
+            agency_name_to_id[result.agency_name] = result.agency_id
+
+    closest_agency_name = sorted(
+        agency_name_to_id.keys(), key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x)
+    )[0]
+    closest_agency_id = sorted(
+        agency_id_to_name.keys(), key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x)
+    )[0]
+
+    name_distance = Levenshtein.distance(closest_agency_name.lower(), args.agency.lower()) / len(closest_agency_name)
+    id_distance = Levenshtein.distance(closest_agency_id.lower(), args.agency.lower()) / len(closest_agency_id)
+
+    if name_distance < id_distance:
+        agency_id = agency_name_to_id[closest_agency_name]
+    else:
+        agency_id = closest_agency_id
+
+    logger.info(f"using agency {agency_id}: {agency_id_to_name[agency_id]}")
+
+    calendar = metadata.tables["calendar"]
+    calendar_dates = metadata.tables["calendar_dates"]
+
+    weekday_fields = [
+        calendar.c.monday,
+        calendar.c.tuesday,
+        calendar.c.wednesday,
+        calendar.c.thursday,
+        calendar.c.friday,
+        calendar.c.saturday,
+        calendar.c.sunday,
+    ]
+
+    # Combined query following GTFS rules:
+    # (services in calendar AND NOT in calendar_dates as removed) OR (services in calendar_dates as added)
+    valid_services_stmt = (
+        select(calendar.c.service_id)
+        .where(calendar.c.start_date <= target_date)
+        .where(calendar.c.end_date >= target_date)
+        .where(weekday_fields[weekday] == 1)
+        .where(
+            calendar.c.service_id.not_in(
+                select(calendar_dates.c.service_id)
+                .where(calendar_dates.c.date == target_date)
+                .where(calendar_dates.c.exception_type == 2)
+            )
+        )
+        .union(
+            select(calendar_dates.c.service_id)
+            .where(calendar_dates.c.date == target_date)
+            .where(calendar_dates.c.exception_type == 1)
+        )
+    ).subquery()
+
     trips = metadata.tables["trips"]
     stop_times = metadata.tables["stop_times"]
     stops = metadata.tables["stops"]
     routes = metadata.tables["routes"]
-    calendar = metadata.tables["calendar"]
-
     query = (
         select(
             routes.c.agency_id,
@@ -42,9 +109,6 @@ def main():
             routes.c.route_short_name,
             trips.c.trip_id,
             trips.c.service_id,
-            calendar.c.monday,
-            calendar.c.start_date,
-            calendar.c.end_date,
             stop_times.c.stop_sequence,
             stop_times.c.arrival_time,
             stop_times.c.departure_time,
@@ -54,10 +118,10 @@ def main():
             stops.c.stop_lon,
         )
         .where(routes.c.agency_id == agency_id)
+        .where(trips.c.service_id.in_(select(valid_services_stmt)))
         .join(trips, trips.c.route_id == routes.c.route_id)
         .join(stop_times, stop_times.c.trip_id == trips.c.trip_id)
         .join(stops, stops.c.stop_id == stop_times.c.stop_id)
-        .join(calendar, calendar.c.service_id == trips.c.service_id)
     )
 
     output_file_path = Path(args.query_output_file)
