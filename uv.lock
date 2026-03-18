@@ -766,7 +766,7 @@ dependencies = [
 [[package]]
 name = "optool"
 version = "0.10.0"
-source = { git = "https://gitlab.com/ocsept/optool.git?rev=develop#86bc47f75a228a929e6c68a048de712a2cd61937" }
+source = { git = "https://gitlab.com/ocsept/optool.git?rev=develop#cae1d049d97f9b28e14bb2c59ef0f5dacc350d2f" }
 dependencies = [
     { name = "casadi" },
     { name = "humanize" },
