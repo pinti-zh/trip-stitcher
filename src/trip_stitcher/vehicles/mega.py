@@ -3,11 +3,12 @@ from ocsept.models.components.chassis import Chassis
 from ocsept.models.components.propulsion import ElectricMotor, ElectricPowertrain
 from ocsept.models.components.vehicles import BatteryBus
 
+# MEGA
 chassis = Chassis(
-    length="10.633m",
-    weight="13.5t",
-    gvm="18t",
-    aerodynamic_drag_area="5.0m^2",
+    length="12.135m",
+    weight="14.5t",
+    gvm="19.5t",
+    aerodynamic_drag_area="5.3m^2",
     rolling_friction=0.012,
     wheel_inertia=[(10, "20kg*m^2")],
     wheel_radius="0.45m",
@@ -29,9 +30,9 @@ powertrain = ElectricPowertrain(
     final_drive_transmission_ratio=6.2,
 )
 battery = Battery(
-    weight="1800kg",
+    weight="2100kg",
     chemistry=BatteryChemistry.LTO,
-    capacity="120kWh",
+    capacity="140kWh",
     c_rate_limit_continuous_charging="4.1/h",
     c_rate_limit_continuous_discharging="4.1/h",
     c_rate_limit_peak_charging="6/h",

@@ -16,5 +16,13 @@ data/
 *.sqlite
 output/
 
+# notebooks
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
 # Pycharm
 .idea
+
+# macOS
+.DS_STORE

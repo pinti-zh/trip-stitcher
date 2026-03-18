@@ -3,6 +3,7 @@ from ocsept.models.components.chassis import Chassis
 from ocsept.models.components.propulsion import ElectricMotor, ElectricPowertrain
 from ocsept.models.components.vehicles import BatteryBus
 
+# MINI
 chassis = Chassis(
     length="5.94m",
     weight="2.7t",
