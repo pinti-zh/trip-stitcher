@@ -17,8 +17,6 @@ data/
 output/
 
 # notebooks
-notebooks/
-*.ipynb
 .ipynb_checkpoints/
 
 # Pycharm

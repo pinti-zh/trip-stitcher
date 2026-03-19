@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime
 
 import pandas as pd
@@ -30,6 +31,17 @@ class Route(BaseModel):
         for route_id, data_dict in route_dict.items():
             routes.append(Route(id=route_id, name=data_dict["name"], trips=data_dict["trips"]))
         return routes
+
+    def find_representative_trip(self, trip_dict: dict[str, "Trip"]):
+        assert len(self.trips) > 0
+        trips = [trip_dict[trip_id] for trip_id in self.trips]
+        stop_tuples = [tuple(trip.stops) for trip in trips]
+        most_common_tuple = Counter(stop_tuples).most_common(1)[0][0]
+        for trip in trips:
+            if tuple(trip.stops) == most_common_tuple:
+                return trip
+        # This should never happen
+        raise RuntimeError("No representative trip with the most common stops found")
 
 
 class TripGeometry(BaseModel):

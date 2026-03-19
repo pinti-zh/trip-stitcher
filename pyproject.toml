@@ -7,14 +7,12 @@ requires-python = ">=3.13.2"
 dependencies = [
     "fastparquet>=2025.12.0",
     "levenshtein>=0.27.3",
-    "matplotlib>=3.10.8",
     "optool",
     "ocsept",
     "pyarrow>=23.0.1",
     "requests>=2.32.5",
     "requests-cache>=1.3.1",
     "scikit-learn>=1.8.0",
-    "seaborn>=0.13.2",
     "sqlalchemy>=2.0.48",
 ]
 
@@ -28,3 +26,11 @@ build-parquet = "trip_stitcher.scripts.build_parquet_from_db:main"
 find-trips = "trip_stitcher.scripts.find_trips:main"
 calculate-energy-demand = "trip_stitcher.scripts.calculate_energy_demand:main"
 stitch = "trip_stitcher.scripts.stitch:main"
+
+[project.optional-dependencies]
+notebooks = [
+    "cartopy>=0.25.0",
+    "jupyterlab>=4.5.6",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+]
