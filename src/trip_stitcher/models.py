@@ -3,9 +3,11 @@ from datetime import datetime
 
 import pandas as pd
 import requests
+from ocsept.models.transport.itinerary import Segment, TravelItinerary, Waypoint
 from pydantic import BaseModel
 
-from trip_stitcher.utils import str_to_datetime
+from trip_stitcher.elevation import ElevationOracle
+from trip_stitcher.utils import limits_from_speed, str_to_datetime, upsample
 
 
 class Route(BaseModel):
@@ -50,6 +52,26 @@ class TripGeometry(BaseModel):
     distance: list[float]
     elevation: list[float]
     is_stop: list[bool]
+    speed_limit: list[float]
+
+    @property
+    def cumulative_distance(self) -> list[float]:
+        cumulative_distance = [0.0]
+        for d in self.distance:
+            cumulative_distance.append(cumulative_distance[-1] + d)
+        return cumulative_distance
+
+    def create_itinerary(self) -> TravelItinerary:
+        elements: list[Waypoint | Segment] = [
+            Waypoint(maximum_speed_limit="0 km/h", elevation=f"{self.elevation[0]} m")
+        ]
+        for sl, el, halt, d in zip(self.speed_limit, self.elevation[1:], self.is_stop[1:], self.distance):
+            if d <= 0:
+                continue
+            elements.append(Segment(length=f"{d} m", maximum_speed_limit=f"{sl} km/h"))
+            waypoint_sl = 0.0 if halt else sl
+            elements.append(Waypoint(maximum_speed_limit=f"{waypoint_sl} km/h", elevation=f"{el} m"))
+        return TravelItinerary.from_elements(*elements)
 
 
 class Trip(BaseModel):
@@ -59,7 +81,9 @@ class Trip(BaseModel):
     arrival_times: list[str]
     estimated_energy_demand: float | None = None  # energy demand in joule
 
-    def download_geometry(self, stop_dict: dict[str, "Stop"], elevation: bool = False) -> TripGeometry:
+    def download_geometry(
+        self, stop_dict: dict[str, "Stop"], elevation_oracle: ElevationOracle | None = None
+    ) -> TripGeometry:
         coord_string = ";".join(
             f"{round(lon, 6)},{round(lat, 6)}"
             for lat, lon in zip(
@@ -74,21 +98,35 @@ class Trip(BaseModel):
             raise Exception(f"API request failed with code: {data['code']}")
 
         route_data = data["routes"][0]
-        if elevation:
-            raise NotImplementedError("Adding elevation is not implemented yet")
-
+        lon = [c[0] for c in route_data["geometry"]["coordinates"]]
+        lat = [c[1] for c in route_data["geometry"]["coordinates"]]
         distance = []
+        speed = []
         is_stop = [True]
         for leg in route_data["legs"]:
             distance += leg["annotation"]["distance"]
+            speed += leg["annotation"]["speed"]
             is_stop += [False] * (len(leg["annotation"]["distance"]) - 1) + [True]
 
+        if elevation_oracle is None:
+            elevation_data = [400.0] * len(route_data["geometry"]["coordinates"])
+        else:
+            sampled_elevation_data = elevation_oracle.get_elevation(
+                [value for sample, value in zip(is_stop, lat) if sample],
+                [value for sample, value in zip(is_stop, lon) if sample],
+            )
+            cumulative_distance = [0.0]
+            for d in distance:
+                cumulative_distance.append(cumulative_distance[-1] + d)
+            elevation_data = upsample(cumulative_distance, sampled_elevation_data, is_stop)
+
         return TripGeometry(
-            lon=[c[0] for c in route_data["geometry"]["coordinates"]],
-            lat=[c[1] for c in route_data["geometry"]["coordinates"]],
+            lon=lon,
+            lat=lat,
             distance=distance,
-            elevation=[400] * len(route_data["geometry"]["coordinates"]),
+            elevation=elevation_data,
             is_stop=is_stop,
+            speed_limit=limits_from_speed([s * 3.6 for s in speed]),
         )
 
     @staticmethod
