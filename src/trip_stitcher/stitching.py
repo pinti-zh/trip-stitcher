@@ -30,4 +30,4 @@ def stitch_trips_into_driving_missions(
             new_driving_mission = DrivingMission()
             new_driving_mission.add_trip(trip)
             driving_missions.append(new_driving_mission)
-    return driving_missions
+    return sorted(driving_missions, key=lambda dm: dm.trips[0].arrival_times[0])
