@@ -7,65 +7,46 @@ from loguru import logger
 
 from trip_stitcher.models import DrivingMission, Stop, Trip, str_to_datetime
 from trip_stitcher.pipeline import collect, get_default_parser
+from trip_stitcher.plot_utils import color_map, name_to_line_map
+from trip_stitcher.stitching import (
+    driving_mission_ends_at_trip_start,
+    driving_mission_ends_before_trip,
+    stitch_trips_into_driving_missions,
+)
 from trip_stitcher.utils import setup_logger
-
-
-def peak(value: float) -> float:
-    assert 0 <= value <= 1
-    if 1 / 6 <= value <= 3 / 6:
-        return 1
-    else:
-        d1 = abs(1 / 6 - value)
-        d2 = abs(3 / 6 - value)
-        return max(1 - 6 * d1, 1 - 6 * d2, 0)
-
-
-def color_map(value: float) -> tuple[float, float, float]:
-    value = max(min(value, 1), 0)
-    red_value = value + 1 / 3
-    if red_value > 1:
-        red_value -= 1
-    green_value = value - 1 / 3
-    if green_value < 0:
-        green_value += 1
-    blue_value = value
-    return peak(red_value), peak(green_value), peak(blue_value)
 
 
 def stitch(trips: list[Trip], args: Namespace, df: pd.DataFrame | None = None) -> list[DrivingMission]:
     if df is None:
         raise ValueError("df must not be None")
-    stop_names = dict((stop.id, stop.name) for stop in Stop.list_from_dataframe(df))
 
-    driving_missions = []
-    unique_stops = []
-    for trip in trips:
-        unique_stops.append(stop_names[trip.stops[0]].split(":")[0])
-        unique_stops.append(stop_names[trip.stops[-1]].split(":")[0])
-        driving_missions = sorted(driving_missions, key=lambda m: m.end_time)
-        for driving_mission in filter(lambda m: m.is_addable(trip), driving_missions):
-            driving_mission.add_trip(trip)
-            break
-        else:
-            new_driving_mission = DrivingMission()
-            new_driving_mission.add_trip(trip)
-            driving_missions.append(new_driving_mission)
+    stop_dict = dict((stop.id, stop) for stop in Stop.list_from_dataframe(df))
+
+    driving_missions = stitch_trips_into_driving_missions(
+        trips, lambda dm, t: driving_mission_ends_at_trip_start(dm, t) and driving_mission_ends_before_trip(dm, t)
+    )
 
     logger.debug(f"Distributed {len(trips)} trips to {len(driving_missions)} driving missions")
-    unique_stops = list(set(unique_stops))
-    stops_to_int = dict((stop_name, i + 1) for i, stop_name in enumerate(unique_stops))
 
     if args.plot:
+        terminal_stops = []
+        for trip in trips:
+            terminal_stops.append(stop_dict[trip.stops[0]])
+            terminal_stops.append(stop_dict[trip.stops[-1]])
+
+        line_map = name_to_line_map(terminal_stops)
+
         sns.set_style("darkgrid")
         colors = [color_map(i / len(driving_missions)) for i in range(len(driving_missions))]
         for color, driving_mission in zip(colors, driving_missions):
             for trip in driving_mission.trips:
                 trip_start_time = str_to_datetime(trip.arrival_times[0])
                 trip_end_time = str_to_datetime(trip.arrival_times[-1])
-                start = stops_to_int[stop_names[trip.stops[0]].split(":")[0]]
-                stop = stops_to_int[stop_names[trip.stops[-1]].split(":")[0]]
+                start = line_map[stop_dict[trip.stops[0]].name]
+                stop = line_map[stop_dict[trip.stops[-1]].name]
                 plt.plot([trip_start_time, trip_end_time], [start, stop], c=color, marker=".", markersize=5)
-        plt.yticks(list(stops_to_int.values()), list(stops_to_int.keys()))
+        plt.yticks(list(line_map.values()), list(line_map.keys()))
+        plt.title("Driving Missions")
         plt.show()
     return driving_missions
 

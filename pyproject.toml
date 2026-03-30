@@ -15,18 +15,24 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "sqlalchemy>=2.0.48",
     "scikit-image>=0.26.0",
+    "pandas>=3.0.1",
 ]
 
 [tool.uv.sources]
 ocsept = { git = "https://gitlab.com/ocsept/ocsept.git", rev = "feature/pydantic-update" }
 optool = { git = "https://gitlab.com/ocsept/optool.git", rev = "develop" }
 
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+]
+
 [project.scripts]
 build-db = "trip_stitcher.scripts.build_db_from_gtfs:main"
 build-parquet = "trip_stitcher.scripts.build_parquet_from_db:main"
 find-trips = "trip_stitcher.scripts.find_trips:main"
 calculate-energy-demand = "trip_stitcher.scripts.calculate_energy_demand:main"
-stitch = "trip_stitcher.scripts.stitch_stitch:main"
+stitch = "trip_stitcher.scripts.stitch_trips:main"
 
 [project.optional-dependencies]
 notebooks = [
