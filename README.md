@@ -2,7 +2,20 @@
 
 ![banner.png](assets/banner.png)
 
-**⚠️ Disclaimer:** This repository is a work in progress. Its purpose and implementations are still evolving, and changes may occur frequently.
+## Project Overview
+
+This project provides tools for analyzing public transport trips, with a focus on bus operations. It is designed to help researchers, planners, and developers understand trip patterns, energy requirements, and vehicle allocation.  
+
+The project offers three main functionalities:
+
+1. **Extract Public Bus Trips from GTFS Data**  
+   Parse and process GTFS feeds to extract individual bus trips, including stop sequences, timings, and route information.
+
+2. **Estimate Energy Demands of Trips**  
+   Compute energy consumption for each extracted trip based on vehicle parameters and trip characteristics, helping evaluate operational efficiency and sustainability.
+
+3. **Stitch Trips into Driving Missions**  
+   Allocate trips to vehicles by "stitching" individual bus trips together into driving missions, supporting vehicle scheduling and fleet optimization.
 
 ## Installation
 
@@ -41,10 +54,16 @@ pip install --upgrade pip
 pip install git+https://gitlab.com/ocsept/ocsept.git@develop
 ```
 
-**5. Install dependencies:**
+**5. Install project:**
 
 ```
-pip install -r requirements.txt
+pip install .
+```
+
+or if you also want to use the notebooks
+
+```
+pip install ".[notebooks]"
 ```
 
 ## Usage
@@ -73,7 +92,7 @@ This step assumes that you have a directory containing
 all the .txt files of the GTFS dataset.
 
 ```
-python db_creation.py --gtfs-directory <your-gtfs-directory> 
+build-db --gtfs-directory <your-gtfs-directory> 
 ```
 
 This can take a few minutes.
@@ -85,22 +104,61 @@ After successful execution of the script the data is stored in a database for fa
 Chose a destination for the relevant data, for example `data/postauto.parquet`.
 
 ```
-python build_postauto_dataset.py --query-output-file <your-destination>
+build-parquet --query-output-file <your-destination> --agency postauto
 ```
 
 **5. Extract trips and estimate energy demands:**
 
 To extract the trips and calculate the energy demands we use three scripts:
-1. `trips.py`: Extracts trips from a .parquet file.
-2. `osrm.py`: Augments trips with routing and elevation data.
-3. `energy_demand.py`: Estimates energy demands of the trips. 
+1. `find-trips`: Extracts trips near a specified location.
+2. `calculate-energy-demand`: Augments trips with estimated energy demands.
+3. `stitch`: "Stitches" trips together into driving missions. 
 
 All scripts output structured JSON Lines to stdout and log to stderr. This means you can specify output files or pipe the scripts to one another, and combine them with Unix commands. For example, you can run:
 
 ```
-python trips.py --file data/postauto.parquet | head -n 8| python osrm.py | python energy_demand.py --bus-type mini > output/energy_demands.jsonl
+find-trips --file data/postauto.parquet | head -n 8 | stitch > output/driving_missions.jsonl
 ```
 
-This will estimate the energy demand of the first 8 trips extracted from `data/postauto.parquet` and write the output to `output/energy_demands.jsonl`.
+This will find trips near a location and stitches together the first 8 into driving missions.
 
-**Warning:** Since `osrm.py` is using public APIs, an internet connection is required to run the script.
+**Warning:** Since `calculate-energy-demand` uses public APIs, an internet connection is required to run the script.
+
+## Notebooks
+
+This repository includes Jupyter notebooks designed to help you understand the key concepts behind the project. They provide step-by-step explanations and examples, showing how the code works and how it should be used effectively.  
+
+Explore these notebooks to get a hands-on understanding and see the best practices in action.
+
+## Future Improvements
+
+- Add service trips from and to depots.
+- Add logic for buses to return to depots based on energy consumption.
+- Differentiate between separate stops and split terminals.
+- Get speed limits from an API instead of guessing.
+
+## Acknowledgements
+
+**Main Contributors:**
+- Luca Pinter
+- Fabio Widmer
+- Andreas Hiropedi
+
+### Special Thanks
+We would also like to thank the following organizations and individuals for their support and contributions:
+
+- **Organizations**
+  - PostAuto Switzerland
+  - Zurich Information Security & Privacy Center (ZISC)
+  - Institute for Dynamic Systems and Control (IDSC), ETH Zürich
+
+- **Individuals**
+  - **Eric Imstepf** - for making the collaboration with PostAuto seamless, always bringing enthusiasm and encouragement to the project.
+  - **Julien Burri** - for providing valuable feedback on real-world constraints during the project collaboration with PostAuto.
+  - **Anina Leuch & Lars Schmutz** - for providing data from PostAuto, offering valuable feedback, and consistently participating in our monthly meetings. 
+  - **Dr. Kari Kostiainen** - for supporting the project through ZISC and making collaboration effortless by keeping formalities and bureaucracy to a minimum.
+  - **Prof. Dr. Christopher Onder** – for his support as head of the IDSC research group.
+
+## License
+
+This project is released under the **MIT License**.
