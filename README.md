@@ -122,7 +122,7 @@ find-trips --file data/postauto.parquet | head -n 8 | stitch > output/driving_mi
 
 This will find trips near a location and stitches together the first 8 into driving missions.
 
-**Warning:** Since `calculate-energy-demand` uses public APIs, an internet connection is required to run the script.
+**⚠️ Warning:** Since `calculate-energy-demand` uses public APIs, an internet connection is required to run the script.
 
 ## Notebooks
 
