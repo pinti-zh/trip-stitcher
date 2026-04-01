@@ -136,13 +136,13 @@ Explore these notebooks to get a hands-on understanding and see the best practic
 - Add logic for buses to return to depots based on energy consumption.
 - Differentiate between separate stops and split terminals.
 - Get speed limits from an API instead of guessing.
+- Add feature to let the user specify vehicles types or minimum passenger capacity.
 
 ## Acknowledgements
 
 **Main Contributors:**
-- Luca Pinter
-- Fabio Widmer
-- Andreas Hiropedi
+- Luca Pinter [IDSC]
+- Fabio Widmer [IDSC]
 
 ### Special Thanks
 We would also like to thank the following organizations and individuals for their support and contributions:
@@ -153,11 +153,11 @@ We would also like to thank the following organizations and individuals for thei
   - Institute for Dynamic Systems and Control (IDSC), ETH Zürich
 
 - **Individuals**
-  - **Eric Imstepf** - for making the collaboration with PostAuto seamless, always bringing enthusiasm and encouragement to the project.
-  - **Julien Burri** - for providing valuable feedback on real-world constraints during the project collaboration with PostAuto.
-  - **Anina Leuch & Lars Schmutz** - for providing data from PostAuto, offering valuable feedback, and consistently participating in our monthly meetings. 
-  - **Dr. Kari Kostiainen** - for supporting the project through ZISC and making collaboration effortless by keeping formalities and bureaucracy to a minimum.
-  - **Prof. Dr. Christopher Onder** – for his support as head of the IDSC research group.
+  - **Eric Imstepf [PostAuto]** - for making the collaboration with PostAuto seamless, always bringing enthusiasm and encouragement to the project.
+  - **Julien Burri [PostAuto]** - for providing valuable feedback on real-world constraints during the project collaboration with PostAuto.
+  - **Anina Leuch & Lars Schmutz [PostAuto]** - for providing data from PostAuto, offering valuable feedback, and consistently participating in our monthly meetings. 
+  - **Dr. Kari Kostiainen [ZISC]** - for supporting the project through ZISC and making collaboration effortless by keeping formalities and bureaucracy to a minimum.
+  - **Prof. Dr. Christopher Onder [IDSC]** – for his support as head of the IDSC research group.
 
 ## License
 
