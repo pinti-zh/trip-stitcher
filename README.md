@@ -117,7 +117,7 @@ To extract the trips and calculate the energy demands we use three scripts:
 All scripts output structured JSON Lines to stdout and log to stderr. This means you can specify output files or pipe the scripts to one another, and combine them with Unix commands. For example, you can run:
 
 ```
-find-trips --file data/postauto.parquet | head -n 8 | stitch > output/driving_missions.jsonl
+uv run find-trips --data-file data/postauto.parquet --input sample_query.jsonl | head -n 8 | uv run stitch --data-file data/postauto.parquet --plot > output/driving_missions.jsonl
 ```
 
 This will find trips near a location and stitches together the first 8 into driving missions.
