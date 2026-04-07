@@ -1,6 +1,6 @@
 import sys
 from argparse import ArgumentParser
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from time import perf_counter
 
@@ -12,6 +12,16 @@ from loguru import logger
 from sqlalchemy import MetaData, create_engine, select
 
 
+def is_valid_yyyymmdd(date_str):
+    try:
+        # Try to parse the string as a date
+        datetime.strptime(date_str, "%Y%m%d")
+        return True
+    except ValueError:
+        # Raised if format is wrong or date is invalid
+        return False
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument("--debug", action="store_true")
@@ -19,6 +29,9 @@ def main():
     parser.add_argument("--query-output-file", type=str, dest="query_output_file")
     parser.add_argument("--chunk-size", type=int, dest="chunk_size", default=100000)
     parser.add_argument("--agency", type=str, dest="agency", default="801", help="agency id or name")
+    parser.add_argument(
+        "--date", type=str, dest="date", default="20250113", help="date of target day (format: YYYYMMDD)"
+    )
     args = parser.parse_args()
 
     if not args.debug:
@@ -30,8 +43,12 @@ def main():
     metadata = MetaData()
 
     weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    target_date = "20250113"
-    year, month, day = map(int, [target_date[:4], target_date[4:6], target_date[6:]])
+
+    if not is_valid_yyyymmdd(args.date):
+        logger.error(f"wrong date format: {args.date}, expected YYYYMMDD")
+        return
+
+    year, month, day = map(int, [args.date[:4], args.date[4:6], args.date[6:]])
     target_date_object = date(year, month, day)
     weekday = target_date_object.weekday()
     logger.debug(f"target date: {target_date_object} ({weekdays[weekday]})")
@@ -81,19 +98,19 @@ def main():
     # (services in calendar AND NOT in calendar_dates as removed) OR (services in calendar_dates as added)
     valid_services_stmt = (
         select(calendar.c.service_id)
-        .where(calendar.c.start_date <= target_date)
-        .where(calendar.c.end_date >= target_date)
+        .where(calendar.c.start_date <= args.date)
+        .where(calendar.c.end_date >= args.date)
         .where(weekday_fields[weekday] == 1)
         .where(
             calendar.c.service_id.not_in(
                 select(calendar_dates.c.service_id)
-                .where(calendar_dates.c.date == target_date)
+                .where(calendar_dates.c.date == args.date)
                 .where(calendar_dates.c.exception_type == 2)
             )
         )
         .union(
             select(calendar_dates.c.service_id)
-            .where(calendar_dates.c.date == target_date)
+            .where(calendar_dates.c.date == args.date)
             .where(calendar_dates.c.exception_type == 1)
         )
     ).subquery()
