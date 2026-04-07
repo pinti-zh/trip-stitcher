@@ -1,4 +1,3 @@
-from datetime import timedelta
 from typing import Callable
 
 from trip_stitcher.models import DrivingMission, Trip
