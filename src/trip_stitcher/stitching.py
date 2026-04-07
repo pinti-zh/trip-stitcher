@@ -17,18 +17,11 @@ def driving_mission_ends_before_trip(driving_mission: DrivingMission, trip: Trip
     return str_to_datetime(trip.arrival_times[0]) > driving_mission.end_time
 
 
-def trip_exceeds_energy_capacity(
-    driving_mission: DrivingMission, trip: Trip, max_capacity=300 * 3.6e6, minimum_charging_window_hours=4
-) -> bool:
+def trip_exceeds_energy_capacity(driving_mission: DrivingMission, trip: Trip, max_capacity=300 * 3.6e6) -> bool:
     if trip.estimated_energy_demand is None:
         return False
     if driving_mission.end_time is None:
         return trip.estimated_energy_demand > max_capacity
-    has_time_to_charge = (str_to_datetime(trip.arrival_times[0]) - driving_mission.end_time) > timedelta(
-        hours=minimum_charging_window_hours
-    )
-    if has_time_to_charge:
-        return False
     return trip.estimated_energy_demand + driving_mission.energy_demand > max_capacity
 
 
