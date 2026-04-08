@@ -1,3 +1,4 @@
+import uuid
 from collections import Counter
 from datetime import datetime
 
@@ -174,6 +175,16 @@ class Stop(BaseModel):
     name: str
     lon: float
     lat: float
+
+    @staticmethod
+    def create_dummy_depot_from_stops(stops: list["Stop"]) -> "Stop":
+        depot_id = uuid.uuid4().hex
+        return Stop(
+            id=depot_id,
+            name=f"Depot-{depot_id[:4]}",
+            lon=sum(stop.lon for stop in stops) / len(stops),
+            lat=sum(stop.lat for stop in stops) / len(stops),
+        )
 
     @staticmethod
     def list_from_dataframe(df: pd.DataFrame) -> list["Stop"]:
