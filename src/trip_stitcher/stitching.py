@@ -49,8 +49,8 @@ def stitch_trips_into_driving_missions(
 def add_depot_trips(
     driving_missions: list[DrivingMission],
     depot: Stop,
-    time_function: Callable[[str, str], timedelta] | None = None,
-    energy_demand_function: Callable[[str, str], float] | None = None,
+    time_function: Callable[[str, str], timedelta] | None = None,  # function that maps depot ids to timedelta
+    energy_demand_function: Callable[[str, str], float] | None = None,  # function that maps depot ids to energy demand
 ) -> list[DrivingMission]:
     for driving_mission in driving_missions:
         assert driving_mission.trips is not None and len(driving_mission.trips) > 0
