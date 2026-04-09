@@ -132,8 +132,6 @@ Explore these notebooks to get a hands-on understanding and see the best practic
 
 ## Future Improvements
 
-- Add service trips from and to depots.
-- Add logic for buses to return to depots based on energy consumption.
 - Differentiate between separate stops and split terminals.
 - Get speed limits from an API instead of guessing.
 - Add feature to let the user specify vehicles types or minimum passenger capacity.
