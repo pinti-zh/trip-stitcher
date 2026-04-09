@@ -227,7 +227,7 @@ class DrivingMission(BaseModel):
         assert self.end_time is not None
         if self.end_location.split(":")[0] == trip.stops[0].split(":")[0]:
             trip_start_time = str_to_datetime(trip.arrival_times[0])
-            if trip_start_time > self.end_time:
+            if trip_start_time >= self.end_time:
                 return True
         return False
 
@@ -239,6 +239,18 @@ class DrivingMission(BaseModel):
             self.trips.append(trip)
         self.end_location = trip.stops[-1]
         self.end_time = str_to_datetime(trip.arrival_times[-1])
+
+    def add_driving_mission(self, other: "DrivingMission") -> "DrivingMission":
+        if other.end_location is None:
+            return self
+        if self.end_location is None:
+            return other
+        assert self.is_addable(other.trips[0])
+        return DrivingMission(
+            end_location=other.end_location,
+            end_time=other.end_time,
+            trips=self.trips + other.trips,
+        )
 
 
 class RadiusQuery(BaseModel):

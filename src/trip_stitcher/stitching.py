@@ -2,6 +2,9 @@ import uuid
 from datetime import timedelta
 from typing import Callable
 
+from scipy.sparse import csr_array
+from scipy.sparse.csgraph import maximum_bipartite_matching
+
 from trip_stitcher.models import DrivingMission, Stop, Trip
 from trip_stitcher.utils import datetime_to_str, str_to_datetime
 
@@ -44,6 +47,40 @@ def stitch_trips_into_driving_missions(
             new_driving_mission.add_trip(trip)
             driving_missions.append(new_driving_mission)
     return sorted(driving_missions, key=lambda dm: dm.trips[0].arrival_times[0])
+
+
+def stitch_driving_missions(
+    driving_missions: list[DrivingMission], minimum_timedelta: timedelta = timedelta(hours=4)
+) -> list[DrivingMission]:
+    dm_lookup = {}
+    nodes = []
+    for i, first_dm in enumerate(driving_missions):
+        node = []
+        dm_lookup[i] = first_dm
+        for second_dm in driving_missions:
+            assert first_dm.end_time is not None
+            assert second_dm.trips[0].arrival_times is not None and len(second_dm.trips) > 0
+            dt = str_to_datetime(second_dm.trips[0].arrival_times[0]) - first_dm.end_time
+            if dt >= minimum_timedelta:
+                node.append(1)
+            else:
+                node.append(0)
+        nodes.append(node)
+    graph = csr_array(nodes)
+    matching = maximum_bipartite_matching(graph, perm_type="column")
+    index_group = list(range(len(driving_missions)))
+    for i, j in enumerate(matching):
+        if j == -1:
+            continue
+        u = index_group[i]
+        v = index_group[j]
+        dm_lookup[u] = dm_lookup[u].add_driving_mission(dm_lookup[v])
+        index_group[j] = u
+
+    merged_driving_missions = []
+    for index in set(index_group):
+        merged_driving_missions.append(dm_lookup[index])
+    return merged_driving_missions
 
 
 def add_depot_trips(
@@ -93,5 +130,5 @@ def add_depot_trips(
             estimated_energy_demand=energy_from_last_stop,
         )
         driving_mission.trips = [trip_from_depot] + driving_mission.trips
-        driving_mission.trips.append(trip_to_depot)
+        driving_mission.add_trip(trip_to_depot)
     return driving_missions
