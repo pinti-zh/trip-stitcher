@@ -15,6 +15,7 @@ class Route(BaseModel):
     id: str
     name: str
     trips: list[str]
+    vehicle_type: str = "maxi"
 
     @staticmethod
     def list_from_dataframe(df: pd.DataFrame) -> list["Route"]:
