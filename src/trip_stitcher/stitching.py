@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from functools import partial
 from typing import Callable
 
 from scipy.sparse import csr_array
@@ -29,12 +30,52 @@ def driving_mission_ends_before_trip(driving_mission: DrivingMission, trip: Trip
     return str_to_datetime(trip.arrival_times[0]) > driving_mission.end_time
 
 
-def trip_within_energy_capacity(driving_mission: DrivingMission, trip: Trip, max_capacity=300 * 3.6e6) -> bool:
+def trip_within_energy_capacity(
+    driving_mission: DrivingMission, trip: Trip, max_capacity: float = 300 * 3.6e6
+) -> bool:
     if trip.estimated_energy_demand is None:
         return True
     if driving_mission.end_time is None:
         return trip.estimated_energy_demand <= max_capacity
     return trip.estimated_energy_demand + driving_mission.energy_demand <= max_capacity
+
+
+def build_default_is_addable(
+    route_dict: dict[str, Route] | None = None, max_capacity: float | None = None
+) -> Callable[[DrivingMission, Trip], bool]:
+    """
+    Build a composite predicate to determine whether a trip can be added
+    to a driving mission.
+
+    The returned function evaluates a set of conditions that must all be met
+    for a (DrivingMission, Trip) pair to be considered compatible. Additional
+    constraints are included depending on the provided arguments.
+
+    Args:
+        route_dict: Optional mapping used to enforce vehicle compatibility
+            between driving missions and trips.
+        max_capacity: Optional upper bound for energy capacity; ensures that
+            the trip does not exceed the allowed capacity.
+
+    Returns:
+        A callable that takes a DrivingMission and a Trip and returns True
+        if all configured conditions are satisfied, otherwise False.
+    """
+
+    predicates = [
+        driving_mission_ends_before_trip,
+        driving_mission_ends_at_trip_start,
+    ]
+
+    if route_dict is not None:
+        predicates.append(partial(driving_mission_and_trip_match_vehicles, route_dict=route_dict))
+    if max_capacity is not None:
+        predicates.append(partial(trip_within_energy_capacity, max_capacity=max_capacity))
+
+    def is_addable(dm: DrivingMission, t: Trip) -> bool:
+        return all(p(dm, t) for p in predicates)
+
+    return is_addable
 
 
 def stitch_trips_into_driving_missions(
