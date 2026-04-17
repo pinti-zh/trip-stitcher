@@ -5,8 +5,16 @@ from typing import Callable
 from scipy.sparse import csr_array
 from scipy.sparse.csgraph import maximum_bipartite_matching
 
-from trip_stitcher.models import DrivingMission, Stop, Trip
+from trip_stitcher.models import DrivingMission, Route, Stop, Trip
 from trip_stitcher.utils import datetime_to_str, str_to_datetime
+
+
+def driving_mission_and_trip_match_vehicles(
+    driving_mission: DrivingMission, trip: Trip, route_dict: dict[str, Route] | None = None
+) -> bool:
+    if route_dict is None:
+        raise ValueError("route_dict must not be None")
+    return route_dict[trip.route] == route_dict[driving_mission.trips[-1].route]
 
 
 def driving_mission_ends_at_trip_start(driving_mission: DrivingMission, trip: Trip) -> bool:
