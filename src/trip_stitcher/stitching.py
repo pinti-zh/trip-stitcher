@@ -29,12 +29,12 @@ def driving_mission_ends_before_trip(driving_mission: DrivingMission, trip: Trip
     return str_to_datetime(trip.arrival_times[0]) > driving_mission.end_time
 
 
-def trip_exceeds_energy_capacity(driving_mission: DrivingMission, trip: Trip, max_capacity=300 * 3.6e6) -> bool:
+def trip_within_energy_capacity(driving_mission: DrivingMission, trip: Trip, max_capacity=300 * 3.6e6) -> bool:
     if trip.estimated_energy_demand is None:
-        return False
+        return True
     if driving_mission.end_time is None:
-        return trip.estimated_energy_demand > max_capacity
-    return trip.estimated_energy_demand + driving_mission.energy_demand > max_capacity
+        return trip.estimated_energy_demand <= max_capacity
+    return trip.estimated_energy_demand + driving_mission.energy_demand <= max_capacity
 
 
 def stitch_trips_into_driving_missions(
