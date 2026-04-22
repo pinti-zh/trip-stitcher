@@ -253,6 +253,85 @@ class DrivingMission(BaseModel):
             trips=self.trips + other.trips,
         )
 
+    def to_input_dict(
+        self,
+        depot_ids: list[str] | None = None,
+        battery_capacity: float = 300.0 * 3.6e6,
+        max_charging_power: float = 150000.0,
+    ) -> dict:
+        num_vehicles = 1
+        time = []
+        energy_demand = []
+        depot_charge = []
+        in_depot = True
+        for trip in self.trips:
+            trip_start_time = int(
+                (str_to_datetime(trip.arrival_times[0]) - str_to_datetime("00:00:00")).total_seconds()
+            )
+            trip_stop_time = int(
+                (str_to_datetime(trip.arrival_times[-1]) - str_to_datetime("00:00:00")).total_seconds()
+            )
+            assert trip_start_time < trip_stop_time
+            if len(time) == 0 or time[-1] < trip_start_time:
+                energy_demand.append(0.0)
+                time.append(trip_start_time)
+                depot_charge.append(in_depot)
+            energy_demand.append(trip.estimated_energy_demand or 0.0)
+            time.append(trip_stop_time)
+            depot_charge.append(False)
+            in_depot = trip.stops[-1] in depot_ids
+        assert all(t1 < t2 for t1, t2 in zip(time[:-1], time[1:]))
+        time, energy_demand, depot_charge = fit_to_24hs(time, energy_demand, depot_charge)
+        return {
+            "num_vehicles": num_vehicles,
+            "time": time,
+            "energy_demand": [energy_demand],
+            "depot_charge": [depot_charge],
+            "max_charging_power": max_charging_power,
+            "battery_capacity": [battery_capacity],
+            "is_battery": [False],
+        }
+
+
+def fit_to_24hs(
+    time: list[int], energy_demand: list[float], depot_charge: list[bool]
+) -> tuple[list[int], list[float], list[bool]]:
+    """
+    Disclaimer: This code is kinda ugly, might want to refactor in the future.
+    """
+    seconds_in_a_day = 60 * 60 * 24
+
+    adjusted_time, adjusted_energy_demand, adjusted_depot_charge = [], [], []
+
+    # case all good
+    if time[-1] == seconds_in_a_day:
+        return time, energy_demand, depot_charge
+
+    # case more than one day and the day mark is hit exactly
+    if seconds_in_a_day in time:
+        for i, t in enumerate(time):
+            if t == seconds_in_a_day:
+                adjusted_time = [v % seconds_in_a_day for v in time[i + 1 :]] + time[: i + 1]
+                adjusted_energy_demand = energy_demand[i + 1 :] + energy_demand[: i + 1]
+                adjusted_depot_charge = depot_charge[i + 1 :] + depot_charge[: i + 1]
+                return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
+
+    # case one interval needs to split
+    if not all(t <= seconds_in_a_day for t in time):
+        for i, t in enumerate(time):
+            if t > seconds_in_a_day:
+                t_1 = seconds_in_a_day - time[i - 1]
+                t_2 = t - seconds_in_a_day
+                ed_1 = energy_demand[i] * t_1 / (t_1 + t_2)
+                ed_2 = energy_demand[i] * t_1 / (t_1 + t_2)
+                adjusted_time = [v % seconds_in_a_day for v in time[i:]] + time[:i] + [seconds_in_a_day]
+                adjusted_energy_demand = [ed_2] + energy_demand[i + 1 :] + energy_demand[:i] + [ed_1]
+                adjusted_depot_charge = depot_charge[i:] + depot_charge[:i] + [depot_charge[i]]
+                return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
+
+    # case day needs completion
+    return time + [seconds_in_a_day], energy_demand + [0.0], depot_charge + [True]
+
 
 class RadiusQuery(BaseModel):
     radius: float
