@@ -155,11 +155,7 @@ def compute_speed_profile_casadi(itinerary, bus, comfort) -> SpeedProfile:
 
     nlp = {"x": casadi.vertcat(v, a), "f": f_obj, "g": g_all}
     ipopt_opts = {
-        "ipopt.print_level": 0,
-        "ipopt.sb": "yes",
-        "ipopt.max_iter": 3000,
-        "ipopt.tol": 1e-6,
-        "print_time": 0,
+        "ipopt.print_level": 3,
     }
     solver = casadi.nlpsol("speed_profile_solver", "ipopt", nlp, ipopt_opts)
 
@@ -239,6 +235,8 @@ def main() -> None:
         from trip_stitcher.vehicles.maxi import bus
     else:
         from trip_stitcher.vehicles.mini import bus
+
+    # bus.powertrain.motors[0][1].torque_limit = Quantity(1300, "N*m")
 
     elevation_oracle = ElevationOracle()
     trip_geometry = trip.download_geometry(stop_dict, elevation_oracle=elevation_oracle)
@@ -378,6 +376,156 @@ def main() -> None:
     )
 
     fig.show()
+
+    # -------------------------------------------------------------------------
+    # Figure 2: Acceleration profiles + active limits (verification)
+    # Limits are evaluated at the CasADi solution's speed/distance profile.
+    # -------------------------------------------------------------------------
+    s2 = sp_cas.distance.m_as("m")
+    N2 = len(s2)
+    s2_mid = 0.5 * (s2[:-1] + s2[1:])
+
+    # Bus parameters (mirror those inside compute_speed_profile_casadi)
+    _G = 9.81
+    _RHO = 1.225
+    r_w = float(bus.chassis.wheel_radius.m_as("m"))
+    fd_ratio = float(bus.powertrain.final_drive_transmission_ratio)
+    fd_eff = float(bus.powertrain.final_drive_efficiency)
+    Cd_Af = float(bus.chassis.aerodynamic_drag_area.m_as("m**2"))
+    cr = float(bus.chassis.rolling_friction)
+    m_curb = float(bus.curb_weight.m_as("kg"))
+    I_rot = float(bus.rotational_inertia_at_wheels.m_as("kg*m**2"))
+
+    n_m, motor_f2 = bus.powertrain.motors[0]
+    n_m = int(n_m)
+    T_shaft_lim = float(motor_f2.torque_limit.m_as("N*m")) * float(
+        motor_f2.transmission_ratio
+    )
+    P_motor_lim = float(motor_f2.power_limit.m_as("W"))
+    motor_eff = float(motor_f2.constant_efficiency)
+    P_bat_max = float(bus.battery.get_maximum_power_output(soc=0.7, soh=1.0).m_as("W"))
+
+    # Itinerary quantities at CasADi sample points
+    alpha2 = itinerary.get_inclination(sp_cas.distance).m_as("rad")
+    m_payload2 = itinerary.get_payload(sp_cas.distance).m_as("kg")
+    p_aux2 = itinerary.get_peak_auxiliary_power(sp_cas.distance).m_as("W")
+
+    m_eff2 = m_curb + m_payload2 + I_rot / r_w**2
+    F_grav2 = m_eff2 * _G * np.sin(alpha2)
+    F_roll2 = cr * m_eff2 * _G * np.cos(alpha2)
+    P_mech_max2 = np.minimum(P_motor_lim, (P_bat_max - p_aux2) / n_m * motor_eff)
+
+    # Mid-interval quantities
+    v2 = sp_cas.speed.m_as("m/s")
+    v2_mid = 0.5 * (v2[:-1] + v2[1:])
+    v2_safe = np.maximum(v2_mid, 1e-3)
+    m_eff2_mid = 0.5 * (m_eff2[:-1] + m_eff2[1:])
+    F_grav2_mid = 0.5 * (F_grav2[:-1] + F_grav2[1:])
+    F_roll2_mid = 0.5 * (F_roll2[:-1] + F_roll2[1:])
+    F_aero2_mid = 0.5 * _RHO * Cd_Af * v2_mid**2
+    P_mech_max2_mid = 0.5 * (P_mech_max2[:-1] + P_mech_max2[1:])
+    shaft_spd2 = v2_safe * fd_ratio / r_w
+
+    # Net resistance contribution to acceleration (negative = opposing motion)
+    a_resist = (-F_grav2_mid - F_aero2_mid - F_roll2_mid) / m_eff2_mid
+
+    # Acceleration limits from torque and power individually
+    a_lim_torque = n_m * T_shaft_lim * fd_ratio * fd_eff / r_w / m_eff2_mid + a_resist
+    a_lim_power = (
+        n_m * (P_mech_max2_mid / shaft_spd2) * fd_ratio * fd_eff / r_w / m_eff2_mid
+        + a_resist
+    )
+
+    # Comfort limits
+    a_comfort_decel = float(comfort.constant_deceleration_limit.m_as("m/s**2"))
+    c_acc = float(comfort.constant_acceleration_limit.m_as("m/s**2"))
+    if comfort.is_speed_dependent():
+        a0_acc = float(comfort.max_acceleration_standstill.m_as("m/s**2"))
+        b_acc = float(comfort.acceleration_shrink_rate.m_as("s/m"))
+        a_lim_comfort = c_acc + (a0_acc - c_acc) * 2 / (1 + np.exp(b_acc * v2_mid))
+    else:
+        a_lim_comfort = np.full(N2 - 1, c_acc)
+
+    # Actual accelerations
+    a_cas2 = sp_cas.acceleration.m_as("m/s**2")
+
+    # Reference acceleration re-sampled to CasADi midpoints
+    d_ref_mid = 0.5 * (sp_ref.distance.m_as("m")[:-1] + sp_ref.distance.m_as("m")[1:])
+    a_ref_interp = np.interp(s2_mid, d_ref_mid, sp_ref.acceleration.m_as("m/s**2"))
+
+    # Y-axis range: focus on the physically meaningful region
+    y_lo = a_comfort_decel - 0.5
+    y_hi = float(np.nanmax(a_lim_comfort)) + 0.5
+
+    fig2 = go.Figure()
+
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=a_ref_interp,
+            mode="lines",
+            name="TimeOptimalStrategy (reference)",
+            line=dict(color="#1f77b4", width=2),
+        )
+    )
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=a_cas2,
+            mode="lines",
+            name="CasADi NLP",
+            line=dict(color="#ff7f0e", width=2, dash="dash"),
+        )
+    )
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=a_lim_comfort,
+            mode="lines",
+            name="Comfort accel limit (speed-dep.)",
+            line=dict(color="#2ca02c", width=1.5, dash="dot"),
+        )
+    )
+    fig2.add_trace(
+        go.Scatter(
+            x=[s2_mid[0], s2_mid[-1]],
+            y=[a_comfort_decel, a_comfort_decel],
+            mode="lines",
+            name="Comfort decel limit",
+            line=dict(color="#d62728", width=1.5, dash="dot"),
+        )
+    )
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=np.clip(a_lim_torque, y_lo - 2, y_hi + 2),
+            mode="lines",
+            name="Torque limit",
+            line=dict(color="#9467bd", width=1.5, dash="dashdot"),
+        )
+    )
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=np.clip(a_lim_power, y_lo - 2, y_hi + 2),
+            mode="lines",
+            name="Power limit",
+            line=dict(color="#8c564b", width=1.5, dash="dashdot"),
+        )
+    )
+
+    fig2.update_layout(
+        title=dict(text=f"Acceleration profile & limits — trip {trip.id}", x=0.5),
+        xaxis=dict(title="Distance (m)"),
+        yaxis=dict(
+            title="Acceleration (m/s²)",
+            range=[y_lo, y_hi],
+        ),
+        legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.7)"),
+        template="plotly_white",
+    )
+
+    fig2.show()
 
 
 if __name__ == "__main__":
