@@ -1,12 +1,10 @@
 import time
 from contextlib import contextmanager
 
-import casadi
 import numpy as np
 import plotly.graph_objects as go
 from IPython.utils.io import capture_output
 from loguru import logger
-from ocsept.data.generation.speed import SpeedProfile
 from ocsept.data.generation.speed.time_optimal import TimeOptimalStrategy
 from ocsept.models.transport.comfort import RidingComfort
 from ocsept.models.transport.mission import DrivingMission as OcseptDrivingMission
@@ -14,6 +12,7 @@ from ocsept.simulation.qss import LongitudinalVehicleDynamics
 from optool.uom import Quantity
 
 from trip_stitcher.elevation import ElevationOracle
+from trip_stitcher.energy_demand_estimator import EnergyDemandEstimator
 from trip_stitcher.models import Stop, Trip
 
 
@@ -21,173 +20,6 @@ from trip_stitcher.models import Stop, Trip
 def suppress_output():
     with capture_output():
         yield
-
-
-class _CasadiStrategyTag:
-    """Sentinel satisfying the SpeedProfileStrategy protocol."""
-
-    def process(self, itinerary, vehicle, comfort):
-        return compute_speed_profile_casadi(itinerary, vehicle, comfort)
-
-
-def compute_speed_profile_casadi(itinerary, bus, comfort) -> SpeedProfile:
-    """Compute a time-optimal speed profile via a direct CasADi/IPOPT NLP.
-
-    Equivalent to ``TimeOptimalStrategy().process(itinerary, bus, comfort)``.
-    All internal arithmetic uses plain SI values (no pint). Returns an ocsept
-    ``SpeedProfile`` for drop-in compatibility.
-    """
-    # ------------------------------------------------------------------
-    # 1. Sample distances (SI: metres)
-    # ------------------------------------------------------------------
-    s_qty = itinerary.get_sample_distances("5 m")
-    s = s_qty.m_as("m")  # np.ndarray, shape (N,)
-    N = len(s)
-
-    # ------------------------------------------------------------------
-    # 2. Per-sample constraints from itinerary
-    # ------------------------------------------------------------------
-    v_max = itinerary.get_speed_limit(s_qty, "maximum").m_as("m/s")  # (N,)
-    v_min = itinerary.get_speed_limit(s_qty, "minimum").m_as("m/s")  # (N,)
-    alpha = itinerary.get_inclination(s_qty).m_as("rad")  # (N,)
-    m_payload = itinerary.get_payload(s_qty).m_as("kg")  # (N,)
-    p_aux = itinerary.get_peak_auxiliary_power(s_qty).m_as("W")  # (N,)
-
-    # ------------------------------------------------------------------
-    # 3. Bus parameters
-    # ------------------------------------------------------------------
-    _G = 9.81  # m/s²
-    _RHO = 1.225  # kg/m³  (air density at sea level)
-
-    r_w = float(bus.chassis.wheel_radius.m_as("m"))
-    fd_ratio = float(bus.powertrain.final_drive_transmission_ratio)
-    fd_eff = float(bus.powertrain.final_drive_efficiency)
-    Cd_Af = float(bus.chassis.aerodynamic_drag_area.m_as("m**2"))
-    cr = float(bus.chassis.rolling_friction)
-    m_curb = float(bus.curb_weight.m_as("kg"))
-    I_rot = float(bus.rotational_inertia_at_wheels.m_as("kg*m**2"))
-
-    assert len(bus.powertrain.motors) == 1, (
-        "compute_speed_profile_casadi only supports a single motor type "
-        f"(got {len(bus.powertrain.motors)} entries in bus.powertrain.motors)"
-    )
-    n_motors, motor = bus.powertrain.motors[0]
-    n_motors = int(n_motors)
-    motor_tr = float(motor.transmission_ratio)
-    # Maximum torque at shaft (per motor) — torque_limit is at motor axle
-    T_shaft_limit = float(motor.torque_limit.m_as("N*m")) * motor_tr
-    P_motor_limit = float(
-        motor.power_limit.m_as("W")
-    )  # mechanical power limit per motor
-    motor_eff = float(motor.constant_efficiency)
-
-    P_bat_max = float(bus.battery.get_maximum_power_output(soc=0.7, soh=1.0).m_as("W"))
-
-    # ------------------------------------------------------------------
-    # 4. Comfort parameters
-    # ------------------------------------------------------------------
-    a_decel = float(comfort.constant_deceleration_limit.m_as("m/s**2"))  # negative
-    c_acc = float(comfort.constant_acceleration_limit.m_as("m/s**2"))  # positive
-
-    speed_dependent = comfort.is_speed_dependent()
-    if speed_dependent:
-        a0_acc = float(comfort.max_acceleration_standstill.m_as("m/s**2"))
-        b_acc = float(comfort.acceleration_shrink_rate.m_as("s/m"))
-
-    # ------------------------------------------------------------------
-    # 5. Pre-computed per-sample arrays (numpy, SI)
-    # ------------------------------------------------------------------
-    m_eff = m_curb + m_payload + I_rot / r_w**2  # (N,) effective translational mass
-
-    F_grav = m_eff * _G * np.sin(alpha)  # (N,) gravitational resistance
-    F_roll = cr * m_eff * _G * np.cos(alpha)  # (N,) rolling resistance
-
-    # Per-motor available mechanical power, clamped to motor's own power limit
-    P_elec_per_motor = (P_bat_max - p_aux) / n_motors  # (N,)
-    P_mech_max = np.minimum(P_motor_limit, P_elec_per_motor * motor_eff)  # (N,)
-
-    ds = np.diff(s)  # (N-1,) segment lengths
-
-    # ------------------------------------------------------------------
-    # 6. CasADi decision variables
-    # ------------------------------------------------------------------
-    v = casadi.MX.sym("v", N)  # speed at each sample point (m/s)
-    a = casadi.MX.sym("a", N - 1)  # acceleration in each interval (m/s²)
-
-    # Trapezoidal time steps (CasADi symbolic)
-    tau = 2 * ds / (v[:-1] + v[1:])  # (N-1,)
-
-    # Objective: minimise total travel time
-    f_obj = casadi.sum1(tau)
-
-    g_eq = []  # equality constraints g = 0
-    g_ineq = []  # inequality constraints g >= 0
-
-    for i in range(N - 1):
-        # (a) Velocity continuity
-        g_eq.append(v[i + 1] - v[i] - tau[i] * a[i])
-
-        # (b) Traction force limit (vehicle physics)
-        #     fmax guards against shaft-speed singularity at v = 0
-        v_safe = casadi.fmax(v[i], 1e-3)
-        shaft_speed = v_safe * fd_ratio / r_w  # rad/s at shaft
-        T_one = casadi.fmin(P_mech_max[i] / shaft_speed, T_shaft_limit)
-        F_trac_max = n_motors * T_one * fd_ratio * fd_eff / r_w
-        F_aero_i = 0.5 * _RHO * Cd_Af * v[i] ** 2
-        a_trac_max = (F_trac_max - F_grav[i] - F_aero_i - F_roll[i]) / m_eff[i]
-        g_ineq.append(a_trac_max - a[i])
-
-        # (c) Comfort acceleration limit (speed-dependent sigmoid)
-        if speed_dependent:
-            a_comfort_max = c_acc + (a0_acc - c_acc) * 2 / (
-                1 + casadi.exp(b_acc * v[i])
-            )
-        else:
-            a_comfort_max = c_acc
-        g_ineq.append(a_comfort_max - a[i])
-
-    # ------------------------------------------------------------------
-    # 7. Assemble and solve NLP
-    # ------------------------------------------------------------------
-    g_all = casadi.vertcat(*g_eq, *g_ineq)
-    n_eq = len(g_eq)
-    n_ineq = len(g_ineq)
-
-    nlp = {"x": casadi.vertcat(v, a), "f": f_obj, "g": g_all}
-    ipopt_opts = {
-        "ipopt.print_level": 3,
-    }
-    solver = casadi.nlpsol("speed_profile_solver", "ipopt", nlp, ipopt_opts)
-
-    v0_init = np.clip(0.5 * (v_min + v_max), v_min, v_max)
-    a0_init = np.zeros(N - 1)
-    x0 = np.concatenate([v0_init, a0_init])
-
-    lbx = np.concatenate([v_min, np.full(N - 1, a_decel)])
-    ubx = np.concatenate([v_max, np.full(N - 1, a0_acc if speed_dependent else c_acc)])
-
-    lbg = np.concatenate([np.zeros(n_eq), np.zeros(n_ineq)])
-    ubg = np.concatenate([np.zeros(n_eq), np.full(n_ineq, np.inf)])
-
-    sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
-
-    # ------------------------------------------------------------------
-    # 8. Reconstruct time array and return SpeedProfile
-    # ------------------------------------------------------------------
-    x_sol = np.array(sol["x"]).flatten()
-    v_sol = x_sol[:N]
-    a_sol = x_sol[N:]
-
-    tau_sol = 2 * np.diff(s) / (v_sol[:-1] + v_sol[1:])
-    t_sol = np.cumsum(np.insert(tau_sol, 0, 0.0))
-
-    return SpeedProfile(
-        time=Quantity(t_sol, "s"),
-        distance=Quantity(s, "m"),
-        speed=Quantity(v_sol, "m/s"),
-        acceleration=Quantity(a_sol, "m/s**2"),
-        strategy_used=_CasadiStrategyTag(),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +88,7 @@ def main() -> None:
     # New: direct CasADi NLP
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
-    sp_cas = compute_speed_profile_casadi(itinerary, bus, comfort)
+    sp_cas = EnergyDemandEstimator._compute_speed_profile(itinerary, bus, comfort)
     rt_cas = time.perf_counter() - t0
 
     # -------------------------------------------------------------------------
@@ -436,6 +268,19 @@ def main() -> None:
         + a_resist
     )
 
+    F_trac_max = np.array(
+        [
+            bus.get_maximum_traction_force(
+                speed=Quantity(float(v), "m/s"),
+                auxiliary_power=Quantity(float(p), "W"),
+                soc=0.7,
+                soh=1.0,
+            ).m_as("N")
+            for v, p in zip(v2_mid, 0.5 * (p_aux2[:-1] + p_aux2[1:]))
+        ]
+    )
+    a_max_trac = (F_trac_max - F_grav2_mid - F_aero2_mid - F_roll2_mid) / m_eff2_mid
+
     # Comfort limits
     a_comfort_decel = float(comfort.constant_deceleration_limit.m_as("m/s**2"))
     c_acc = float(comfort.constant_acceleration_limit.m_as("m/s**2"))
@@ -511,6 +356,16 @@ def main() -> None:
             mode="lines",
             name="Power limit",
             line=dict(color="#8c564b", width=1.5, dash="dashdot"),
+        )
+    )
+
+    fig2.add_trace(
+        go.Scatter(
+            x=s2_mid,
+            y=np.clip(a_max_trac, y_lo - 2, y_hi + 2),
+            mode="lines",
+            name="Max traction limit",
+            line=dict(color="#e377c2", width=1.5, dash="dashdot"),
         )
     )
 
