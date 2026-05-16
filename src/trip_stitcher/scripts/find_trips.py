@@ -18,7 +18,7 @@ def find_trips(
     if df is None:
         raise ValueError("df must be provided")
 
-    routes = route_locator.radius_query(radius_query)
+    routes, _ = route_locator.radius_query(radius_query)
     logger.debug(
         f"{len(routes)} routes found within {radius_query.radius} meters of ({radius_query.lat}, {radius_query.lon})"
     )

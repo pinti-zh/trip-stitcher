@@ -16,7 +16,9 @@ class RouteLocator:
         self._stop_to_routes_map = self._get_stop_to_routes_map()
 
         # efficient lookup data structure
-        self._stop_coordinates = np.array([[np.radians(stop.lat), np.radians(stop.lon)] for stop in stops])
+        self._stop_coordinates = np.array(
+            [[np.radians(stop.lat), np.radians(stop.lon)] for stop in stops]
+        )
         self._ball_tree = BallTree(self._stop_coordinates, metric="haversine")
 
     def _get_stop_to_routes_map(self) -> dict[str, str]:
@@ -30,9 +32,9 @@ class RouteLocator:
                         stop_to_routes_map[stop_id].append(route.id)
         return stop_to_routes_map
 
-    def radius_query(self, query: RadiusQuery) -> list[Route]:
+    def radius_query(self, query: RadiusQuery) -> tuple[list[Route], list[Stop]]:
         """
-        Return all routes that have at least one stop within the given radius of the specified coordinates.
+        Return all routes and stops found within the given radius of the specified coordinates.
 
         The query is performed using a BallTree with haversine distance. The input
         coordinates are interpreted as latitude and longitude in degrees, and the
@@ -43,9 +45,12 @@ class RouteLocator:
                 A RadiusQuery object containing radius, latitude and longitude
 
         Returns:
-            list[Route]:
-                A list of unique Route objects that have at least one stop located
-                at most ``radius`` meters from the given coordinates.
+            tuple[list[Route], list[Stop]]:
+                A tuple of:
+                - A list of unique Route objects that have at least one stop located
+                  at most ``radius`` meters from the given coordinates.
+                - A list of Stop objects located at most ``radius`` meters from the
+                  given coordinates.
 
         Notes:
             - Internally converts coordinates to radians for haversine distance.
@@ -58,7 +63,10 @@ class RouteLocator:
         )[0]
 
         routes = set()
+        nearby_stops = []
         for index in stop_indices:
-            routes.update(self._stop_to_routes_map[self.stops[index].id])
+            stop = self.stops[index]
+            nearby_stops.append(stop)
+            routes.update(self._stop_to_routes_map[stop.id])
 
-        return [self._route_dict[route_id] for route_id in routes]
+        return [self._route_dict[route_id] for route_id in routes], nearby_stops
