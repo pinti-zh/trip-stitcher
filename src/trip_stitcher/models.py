@@ -20,7 +20,9 @@ class Route(BaseModel):
     @staticmethod
     def list_from_dataframe(df: pd.DataFrame) -> list["Route"]:
         route_dict = {}
-        for route_id, name, trip_id in zip(df["route_id"], df["route_short_name"], df["trip_id"]):
+        for route_id, name, trip_id in zip(
+            df["route_id"], df["route_short_name"], df["trip_id"]
+        ):
             if route_id not in route_dict:
                 route_dict[route_id] = {
                     "name": name,
@@ -33,7 +35,9 @@ class Route(BaseModel):
 
         routes = []
         for route_id, data_dict in route_dict.items():
-            routes.append(Route(id=route_id, name=data_dict["name"], trips=data_dict["trips"]))
+            routes.append(
+                Route(id=route_id, name=data_dict["name"], trips=data_dict["trips"])
+            )
         return routes
 
     def find_representative_trip(self, trip_dict: dict[str, "Trip"]):
@@ -67,12 +71,16 @@ class TripGeometry(BaseModel):
         elements: list[Waypoint | Segment] = [
             Waypoint(maximum_speed_limit="0 km/h", elevation=f"{self.elevation[0]} m")
         ]
-        for sl, el, halt, d in zip(self.speed_limit, self.elevation[1:], self.is_stop[1:], self.distance):
+        for sl, el, halt, d in zip(
+            self.speed_limit, self.elevation[1:], self.is_stop[1:], self.distance
+        ):
             if d <= 0:
                 continue
             elements.append(Segment(length=f"{d} m", maximum_speed_limit=f"{sl} km/h"))
             waypoint_sl = 0.0 if halt else sl
-            elements.append(Waypoint(maximum_speed_limit=f"{waypoint_sl} km/h", elevation=f"{el} m"))
+            elements.append(
+                Waypoint(maximum_speed_limit=f"{waypoint_sl} km/h", elevation=f"{el} m")
+            )
         return TravelItinerary.from_elements(*elements)
 
 
@@ -82,14 +90,18 @@ class Trip(BaseModel):
     stops: list[str]
     arrival_times: list[str]
     estimated_energy_demand: float | None = None  # energy demand in joule
+    covered_distance: float | None = None  # covered distance in metres
 
     def download_geometry(
-        self, stop_dict: dict[str, "Stop"], elevation_oracle: ElevationOracle | None = None
+        self,
+        stop_dict: dict[str, "Stop"],
+        elevation_oracle: ElevationOracle | None = None,
     ) -> TripGeometry:
         coord_string = ";".join(
             f"{round(lon, 6)},{round(lat, 6)}"
             for lat, lon in zip(
-                [stop_dict[stop_id].lat for stop_id in self.stops], [stop_dict[stop_id].lon for stop_id in self.stops]
+                [stop_dict[stop_id].lat for stop_id in self.stops],
+                [stop_dict[stop_id].lon for stop_id in self.stops],
             )
         )
 
@@ -120,7 +132,9 @@ class Trip(BaseModel):
             cumulative_distance = [0.0]
             for d in distance:
                 cumulative_distance.append(cumulative_distance[-1] + d)
-            elevation_data = upsample(cumulative_distance, sampled_elevation_data, is_stop)
+            elevation_data = upsample(
+                cumulative_distance, sampled_elevation_data, is_stop
+            )
 
         return TripGeometry(
             lon=lon,
@@ -157,7 +171,12 @@ class Trip(BaseModel):
         trips = []
         for trip_id, data_dict in trip_dict.items():
             combined_sorted = sorted(
-                zip(data_dict["stop_sequence"], data_dict["stops"], data_dict["arrival_times"]), key=lambda x: x[0]
+                zip(
+                    data_dict["stop_sequence"],
+                    data_dict["stops"],
+                    data_dict["arrival_times"],
+                ),
+                key=lambda x: x[0],
             )
             _, sorted_stops, sorted_arrival_times = zip(*combined_sorted)
             trips.append(
@@ -190,7 +209,9 @@ class Stop(BaseModel):
     @staticmethod
     def list_from_dataframe(df: pd.DataFrame) -> list["Stop"]:
         stop_dict = {}
-        for stop_id, name, lon, lat in zip(df["stop_id"], df["stop_name"], df["stop_lon"], df["stop_lat"]):
+        for stop_id, name, lon, lat in zip(
+            df["stop_id"], df["stop_name"], df["stop_lon"], df["stop_lat"]
+        ):
             if stop_id not in stop_dict.keys():
                 stop_dict[stop_id] = {
                     "name": name,
@@ -204,7 +225,14 @@ class Stop(BaseModel):
 
         stops = []
         for stop_id, data_dict in stop_dict.items():
-            stops.append(Stop(id=stop_id, name=data_dict["name"], lon=data_dict["lon"], lat=data_dict["lat"]))
+            stops.append(
+                Stop(
+                    id=stop_id,
+                    name=data_dict["name"],
+                    lon=data_dict["lon"],
+                    lat=data_dict["lat"],
+                )
+            )
         return stops
 
 
@@ -266,10 +294,15 @@ class DrivingMission(BaseModel):
         in_depot = True
         for trip in self.trips:
             trip_start_time = int(
-                (str_to_datetime(trip.arrival_times[0]) - str_to_datetime("00:00:00")).total_seconds()
+                (
+                    str_to_datetime(trip.arrival_times[0]) - str_to_datetime("00:00:00")
+                ).total_seconds()
             )
             trip_stop_time = int(
-                (str_to_datetime(trip.arrival_times[-1]) - str_to_datetime("00:00:00")).total_seconds()
+                (
+                    str_to_datetime(trip.arrival_times[-1])
+                    - str_to_datetime("00:00:00")
+                ).total_seconds()
             )
             assert trip_start_time < trip_stop_time
             if len(time) == 0 or time[-1] < trip_start_time:
@@ -281,7 +314,9 @@ class DrivingMission(BaseModel):
             depot_charge.append(False)
             in_depot = trip.stops[-1] in depot_ids
         assert all(t1 < t2 for t1, t2 in zip(time[:-1], time[1:]))
-        time, energy_demand, depot_charge = fit_to_24hs(time, energy_demand, depot_charge)
+        time, energy_demand, depot_charge = fit_to_24hs(
+            time, energy_demand, depot_charge
+        )
         return {
             "num_vehicles": num_vehicles,
             "time": time,
@@ -311,7 +346,9 @@ def fit_to_24hs(
     if seconds_in_a_day in time:
         for i, t in enumerate(time):
             if t == seconds_in_a_day:
-                adjusted_time = [v % seconds_in_a_day for v in time[i + 1 :]] + time[: i + 1]
+                adjusted_time = [v % seconds_in_a_day for v in time[i + 1 :]] + time[
+                    : i + 1
+                ]
                 adjusted_energy_demand = energy_demand[i + 1 :] + energy_demand[: i + 1]
                 adjusted_depot_charge = depot_charge[i + 1 :] + depot_charge[: i + 1]
                 return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
@@ -324,9 +361,17 @@ def fit_to_24hs(
                 t_2 = t - seconds_in_a_day
                 ed_1 = energy_demand[i] * t_1 / (t_1 + t_2)
                 ed_2 = energy_demand[i] * t_1 / (t_1 + t_2)
-                adjusted_time = [v % seconds_in_a_day for v in time[i:]] + time[:i] + [seconds_in_a_day]
-                adjusted_energy_demand = [ed_2] + energy_demand[i + 1 :] + energy_demand[:i] + [ed_1]
-                adjusted_depot_charge = depot_charge[i:] + depot_charge[:i] + [depot_charge[i]]
+                adjusted_time = (
+                    [v % seconds_in_a_day for v in time[i:]]
+                    + time[:i]
+                    + [seconds_in_a_day]
+                )
+                adjusted_energy_demand = (
+                    [ed_2] + energy_demand[i + 1 :] + energy_demand[:i] + [ed_1]
+                )
+                adjusted_depot_charge = (
+                    depot_charge[i:] + depot_charge[:i] + [depot_charge[i]]
+                )
                 return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
 
     # case day needs completion

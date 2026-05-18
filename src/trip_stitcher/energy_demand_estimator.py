@@ -26,7 +26,7 @@ class EnergyDemandEstimator:
             (stop.id, stop) for stop in Stop.list_from_dataframe(df)
         )
         self.elevation_oracle = ElevationOracle()
-        self.cache: dict[tuple[str, ...], float] = {}
+        self.cache: dict[tuple[str, ...], dict[str, float]] = {}
 
     @staticmethod
     def _compute_speed_profile(itinerary, bus, comfort) -> SpeedProfile:
@@ -190,7 +190,10 @@ class EnergyDemandEstimator:
     ) -> float:
         cache_key = tuple(trip.stops + [str(aux_power), str(bus_type)])
         if cache_key in self.cache.keys():
-            return self.cache[cache_key]
+            cached = self.cache[cache_key]
+            trip.estimated_energy_demand = cached["energy"]
+            trip.covered_distance = cached["distance"]
+            return cached["energy"]
 
         trip_geometry = trip.download_geometry(
             self.stop_dict, elevation_oracle=self.elevation_oracle
@@ -258,5 +261,8 @@ class EnergyDemandEstimator:
         ).to("J")
 
         total_energy = propulsion_energy.magnitude + aux_energy.magnitude
-        self.cache[cache_key] = total_energy
+        distance = sum(trip_geometry.distance)
+        self.cache[cache_key] = {"energy": total_energy, "distance": distance}
+        trip.estimated_energy_demand = total_energy
+        trip.covered_distance = distance
         return total_energy
