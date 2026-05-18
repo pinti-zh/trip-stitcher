@@ -37,7 +37,9 @@ def name_to_line_map(stops: list[Stop]) -> dict[str, float]:
     sorted_values = data_pca[idx]
 
     diffs = np.where(
-        np.diff(sorted_values) < (0.5 / len(sorted_values)), 0.5 / len(sorted_values), np.diff(sorted_values)
+        np.diff(sorted_values) < (0.5 / len(sorted_values)),
+        0.5 / len(sorted_values),
+        np.diff(sorted_values),
     )
     log_diffs = np.log(1 + 10 * diffs)
     values = [sorted_values[0]]

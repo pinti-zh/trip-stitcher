@@ -14,20 +14,28 @@ from trip_stitcher.vehicles import maxi, mega, mini
 
 class EnergyDemandEstimator:
     def __init__(self, df: pd.DataFrame):
-        self.stop_dict: dict[str, Stop] = dict((stop.id, stop) for stop in Stop.list_from_dataframe(df))
+        self.stop_dict: dict[str, Stop] = dict(
+            (stop.id, stop) for stop in Stop.list_from_dataframe(df)
+        )
         self.elevation_oracle = ElevationOracle()
         self.cache: dict[tuple[str, ...], float] = {}
 
-    def calculate_energy_demand(self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0) -> float:
+    def calculate_energy_demand(
+        self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0
+    ) -> float:
         cache_key = tuple(trip.stops + [str(aux_power), str(bus_type)])
         if cache_key in self.cache.keys():
             return self.cache[cache_key]
 
-        trip_geometry = trip.download_geometry(self.stop_dict, elevation_oracle=self.elevation_oracle)
+        trip_geometry = trip.download_geometry(
+            self.stop_dict, elevation_oracle=self.elevation_oracle
+        )
 
         max_inclination = max(
             abs(100 * (e2 - e1) / d)
-            for d, e1, e2 in zip(trip_geometry.distance, trip_geometry.elevation[:-1], trip_geometry.elevation[1:])
+            for d, e1, e2 in zip(
+                trip_geometry.distance, trip_geometry.elevation[:-1], trip_geometry.elevation[1:]
+            )
             if d > 0
         )
         assert max_inclination < 20
@@ -72,8 +80,12 @@ class EnergyDemandEstimator:
         propulsion_power = np.where(p_mech >= 0, p_mech / efficiency, p_mech * efficiency)
         propulsion_energy = np.sum(np.diff(speed_profile.time) * propulsion_power).to("J")
 
-        trip_duration = str_to_datetime(trip.arrival_times[-1]) - str_to_datetime(trip.arrival_times[0])
-        aux_energy = (Quantity(aux_power, "W") * Quantity(trip_duration.total_seconds(), "s")).to("J")
+        trip_duration = str_to_datetime(trip.arrival_times[-1]) - str_to_datetime(
+            trip.arrival_times[0]
+        )
+        aux_energy = (Quantity(aux_power, "W") * Quantity(trip_duration.total_seconds(), "s")).to(
+            "J"
+        )
 
         total_energy = propulsion_energy.magnitude + aux_energy.magnitude
         self.cache[cache_key] = total_energy

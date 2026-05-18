@@ -135,8 +135,10 @@ def stitch_driving_missions(
 def add_depot_trips(
     driving_missions: list[DrivingMission],
     depot: Stop,
-    time_function: Callable[[str, str], timedelta] | None = None,  # function that maps depot ids to timedelta
-    energy_demand_function: Callable[[str, str], float] | None = None,  # function that maps depot ids to energy demand
+    time_function: Callable[[str, str], timedelta]
+    | None = None,  # function that maps depot ids to timedelta
+    energy_demand_function: Callable[[str, str], float]
+    | None = None,  # function that maps depot ids to energy demand
 ) -> list[DrivingMission]:
     for driving_mission in driving_missions:
         assert driving_mission.trips is not None and len(driving_mission.trips) > 0
@@ -158,9 +160,15 @@ def add_depot_trips(
             energy_to_first_stop = 0.0
             energy_from_last_stop = 0.0
 
-        departure_datetime = str_to_datetime(driving_mission.trips[0].arrival_times[0]) - time_to_first_stop
-        departure_time = datetime_to_str(departure_datetime, is_next_day=departure_datetime.day == 2)
-        arrival_datetime = str_to_datetime(driving_mission.trips[-1].arrival_times[-1]) + time_from_last_stop
+        departure_datetime = (
+            str_to_datetime(driving_mission.trips[0].arrival_times[0]) - time_to_first_stop
+        )
+        departure_time = datetime_to_str(
+            departure_datetime, is_next_day=departure_datetime.day == 2
+        )
+        arrival_datetime = (
+            str_to_datetime(driving_mission.trips[-1].arrival_times[-1]) + time_from_last_stop
+        )
         arrival_time = datetime_to_str(arrival_datetime, is_next_day=arrival_datetime.day == 2)
 
         trip_from_depot = Trip(

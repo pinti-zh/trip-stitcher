@@ -16,6 +16,7 @@ dependencies = [
     "sqlalchemy>=2.0.48",
     "scikit-image>=0.26.0",
     "pandas>=3.0.1",
+    "ruff>=0.14.5",
 ]
 
 [tool.uv.sources]
@@ -41,3 +42,30 @@ notebooks = [
     "matplotlib>=3.10.8",
     "seaborn>=0.13.2",
 ]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["depot_charging_optimization"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["E402"]

@@ -16,14 +16,19 @@ from trip_stitcher.stitching import (
 from trip_stitcher.utils import setup_logger
 
 
-def stitch(trips: list[Trip], args: Namespace, df: pd.DataFrame | None = None) -> list[DrivingMission]:
+def stitch(
+    trips: list[Trip], args: Namespace, df: pd.DataFrame | None = None
+) -> list[DrivingMission]:
     if df is None:
         raise ValueError("df must not be None")
 
     stop_dict = dict((stop.id, stop) for stop in Stop.list_from_dataframe(df))
 
     driving_missions = stitch_trips_into_driving_missions(
-        trips, lambda dm, t: driving_mission_ends_at_trip_start(dm, t) and driving_mission_ends_before_trip(dm, t)
+        trips,
+        lambda dm, t: (
+            driving_mission_ends_at_trip_start(dm, t) and driving_mission_ends_before_trip(dm, t)
+        ),
     )
 
     logger.debug(f"Distributed {len(trips)} trips to {len(driving_missions)} driving missions")
@@ -44,7 +49,13 @@ def stitch(trips: list[Trip], args: Namespace, df: pd.DataFrame | None = None) -
                 trip_end_time = str_to_datetime(trip.arrival_times[-1])
                 start = line_map[stop_dict[trip.stops[0]].name]
                 stop = line_map[stop_dict[trip.stops[-1]].name]
-                plt.plot([trip_start_time, trip_end_time], [start, stop], c=color, marker=".", markersize=5)
+                plt.plot(
+                    [trip_start_time, trip_end_time],
+                    [start, stop],
+                    c=color,
+                    marker=".",
+                    markersize=5,
+                )
         plt.yticks(list(line_map.values()), list(line_map.keys()))
         plt.title("Driving Missions")
         plt.show()

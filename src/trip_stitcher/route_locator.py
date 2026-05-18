@@ -16,7 +16,9 @@ class RouteLocator:
         self._stop_to_routes_map = self._get_stop_to_routes_map()
 
         # efficient lookup data structure
-        self._stop_coordinates = np.array([[np.radians(stop.lat), np.radians(stop.lon)] for stop in stops])
+        self._stop_coordinates = np.array(
+            [[np.radians(stop.lat), np.radians(stop.lon)] for stop in stops]
+        )
         self._ball_tree = BallTree(self._stop_coordinates, metric="haversine")
 
     def _get_stop_to_routes_map(self) -> dict[str, str]:
