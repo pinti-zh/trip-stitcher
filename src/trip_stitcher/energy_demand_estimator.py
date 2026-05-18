@@ -70,14 +70,10 @@ class EnergyDemandEstimator:
         motor_tr = float(motor.transmission_ratio)
         # Maximum torque at shaft (per motor) — torque_limit is at motor axle
         T_shaft_limit = float(motor.torque_limit.m_as("N*m")) * motor_tr
-        P_motor_limit = float(
-            motor.power_limit.m_as("W")
-        )  # mechanical power limit per motor
+        P_motor_limit = float(motor.power_limit.m_as("W"))  # mechanical power limit per motor
         motor_eff = float(motor.constant_efficiency)
 
-        P_bat_max = float(
-            bus.battery.get_maximum_power_output(soc=0.7, soh=1.0).m_as("W")
-        )
+        P_bat_max = float(bus.battery.get_maximum_power_output(soc=0.7, soh=1.0).m_as("W"))
 
         # ------------------------------------------------------------------
         # 4. Comfort parameters
@@ -135,9 +131,7 @@ class EnergyDemandEstimator:
 
             # (c) Comfort acceleration limit (speed-dependent sigmoid)
             if speed_dependent:
-                a_comfort_max = c_acc + (a0_acc - c_acc) * 2 / (
-                    1 + casadi.exp(b_acc * v[i])
-                )
+                a_comfort_max = c_acc + (a0_acc - c_acc) * 2 / (1 + casadi.exp(b_acc * v[i]))
             else:
                 a_comfort_max = c_acc
             g_ineq.append(a_comfort_max - a[i])
@@ -158,9 +152,7 @@ class EnergyDemandEstimator:
         x0 = np.concatenate([v0_init, a0_init])
 
         lbx = np.concatenate([v_min, np.full(N - 1, a_decel)])
-        ubx = np.concatenate(
-            [v_max, np.full(N - 1, a0_acc if speed_dependent else c_acc)]
-        )
+        ubx = np.concatenate([v_max, np.full(N - 1, a0_acc if speed_dependent else c_acc)])
 
         lbg = np.concatenate([np.zeros(n_eq), np.zeros(n_ineq)])
         ubg = np.concatenate([np.zeros(n_eq), np.full(n_ineq, np.inf)])
@@ -246,19 +238,15 @@ class EnergyDemandEstimator:
         average_velocity = speed_profile.speed[:-1] + speed_profile.speed[1:] / 2
         p_mech = average_velocity * vehicle_dynamics.traction_force[:-1]
         efficiency = 0.9
-        propulsion_power = np.where(
-            p_mech >= 0, p_mech / efficiency, p_mech * efficiency
-        )
-        propulsion_energy = np.sum(np.diff(speed_profile.time) * propulsion_power).to(
-            "J"
-        )
+        propulsion_power = np.where(p_mech >= 0, p_mech / efficiency, p_mech * efficiency)
+        propulsion_energy = np.sum(np.diff(speed_profile.time) * propulsion_power).to("J")
 
         trip_duration = str_to_datetime(trip.arrival_times[-1]) - str_to_datetime(
             trip.arrival_times[0]
         )
-        aux_energy = (
-            Quantity(aux_power, "W") * Quantity(trip_duration.total_seconds(), "s")
-        ).to("J")
+        aux_energy = (Quantity(aux_power, "W") * Quantity(trip_duration.total_seconds(), "s")).to(
+            "J"
+        )
 
         total_energy = propulsion_energy.magnitude + aux_energy.magnitude
         distance = sum(trip_geometry.distance)

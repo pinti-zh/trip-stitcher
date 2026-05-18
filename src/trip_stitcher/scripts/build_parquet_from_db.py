@@ -28,9 +28,15 @@ def main():
     parser.add_argument("--db-name", type=str, dest="db_name", default="gtfs")
     parser.add_argument("--query-output-file", type=str, dest="query_output_file")
     parser.add_argument("--chunk-size", type=int, dest="chunk_size", default=100000)
-    parser.add_argument("--agency", type=str, dest="agency", default="801", help="agency id or name")
     parser.add_argument(
-        "--date", type=str, dest="date", default="20250113", help="date of target day (format: YYYYMMDD)"
+        "--agency", type=str, dest="agency", default="801", help="agency id or name"
+    )
+    parser.add_argument(
+        "--date",
+        type=str,
+        dest="date",
+        default="20250113",
+        help="date of target day (format: YYYYMMDD)",
     )
     args = parser.parse_args()
 
@@ -65,14 +71,20 @@ def main():
             agency_name_to_id[result.agency_name] = result.agency_id
 
     closest_agency_name = sorted(
-        agency_name_to_id.keys(), key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x)
+        agency_name_to_id.keys(),
+        key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x),
     )[0]
     closest_agency_id = sorted(
-        agency_id_to_name.keys(), key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x)
+        agency_id_to_name.keys(),
+        key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x),
     )[0]
 
-    name_distance = Levenshtein.distance(closest_agency_name.lower(), args.agency.lower()) / len(closest_agency_name)
-    id_distance = Levenshtein.distance(closest_agency_id.lower(), args.agency.lower()) / len(closest_agency_id)
+    name_distance = Levenshtein.distance(closest_agency_name.lower(), args.agency.lower()) / len(
+        closest_agency_name
+    )
+    id_distance = Levenshtein.distance(closest_agency_id.lower(), args.agency.lower()) / len(
+        closest_agency_id
+    )
 
     if name_distance < id_distance:
         agency_id = agency_name_to_id[closest_agency_name]

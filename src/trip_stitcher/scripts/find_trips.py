@@ -11,7 +11,9 @@ from trip_stitcher.utils import setup_logger
 
 
 def find_trips(
-    radius_query: RadiusQuery, route_locator: RouteLocator | None = None, df: pd.DataFrame | None = None
+    radius_query: RadiusQuery,
+    route_locator: RouteLocator | None = None,
+    df: pd.DataFrame | None = None,
 ) -> list[Trip]:
     if route_locator is None:
         raise ValueError("route_locator must be provided")
@@ -22,7 +24,9 @@ def find_trips(
     logger.debug(
         f"{len(routes)} routes found within {radius_query.radius} meters of ({radius_query.lat}, {radius_query.lon})"
     )
-    first_few_enrty_string = ", ".join(route.name for route in routes[:3]) + ", ..." * (len(routes) > 3)
+    first_few_enrty_string = ", ".join(route.name for route in routes[:3]) + ", ..." * (
+        len(routes) > 3
+    )
     logger.debug(f"Routes: {first_few_enrty_string}")
 
     trips: list[Trip] = []

@@ -32,21 +32,11 @@ AUX_POWER = 2.0e3  # W
 # Hard-coded sample data (route 220, trip 2.TA.96-100-0-j25-1.8.H)
 # ---------------------------------------------------------------------------
 stop_dict = {
-    "8571330": Stop(
-        id="8571330", name="Reichenbach i. K., Bahnhof", lon=7.690208, lat=46.625525
-    ),
-    "8571331": Stop(
-        id="8571331", name="Reichenbach i. K., Bären", lon=7.694187, lat=46.625432
-    ),
-    "8583254": Stop(
-        id="8583254", name="Scharnachtal, Halten", lon=7.697223, lat=46.620608
-    ),
-    "8507766": Stop(
-        id="8507766", name="Scharnachtal, Viesen", lon=7.697807, lat=46.617979
-    ),
-    "8571332": Stop(
-        id="8571332", name="Scharnachtal, Schulhaus", lon=7.698158, lat=46.614709
-    ),
+    "8571330": Stop(id="8571330", name="Reichenbach i. K., Bahnhof", lon=7.690208, lat=46.625525),
+    "8571331": Stop(id="8571331", name="Reichenbach i. K., Bären", lon=7.694187, lat=46.625432),
+    "8583254": Stop(id="8583254", name="Scharnachtal, Halten", lon=7.697223, lat=46.620608),
+    "8507766": Stop(id="8507766", name="Scharnachtal, Viesen", lon=7.697807, lat=46.617979),
+    "8571332": Stop(id="8571332", name="Scharnachtal, Schulhaus", lon=7.698158, lat=46.614709),
 }
 
 trip = Trip(
@@ -230,9 +220,7 @@ def main() -> None:
 
     n_m, motor_f2 = bus.powertrain.motors[0]
     n_m = int(n_m)
-    T_shaft_lim = float(motor_f2.torque_limit.m_as("N*m")) * float(
-        motor_f2.transmission_ratio
-    )
+    T_shaft_lim = float(motor_f2.torque_limit.m_as("N*m")) * float(motor_f2.transmission_ratio)
     P_motor_lim = float(motor_f2.power_limit.m_as("W"))
     motor_eff = float(motor_f2.constant_efficiency)
     P_bat_max = float(bus.battery.get_maximum_power_output(soc=0.7, soh=1.0).m_as("W"))
@@ -264,8 +252,7 @@ def main() -> None:
     # Acceleration limits from torque and power individually
     a_lim_torque = n_m * T_shaft_lim * fd_ratio * fd_eff / r_w / m_eff2_mid + a_resist
     a_lim_power = (
-        n_m * (P_mech_max2_mid / shaft_spd2) * fd_ratio * fd_eff / r_w / m_eff2_mid
-        + a_resist
+        n_m * (P_mech_max2_mid / shaft_spd2) * fd_ratio * fd_eff / r_w / m_eff2_mid + a_resist
     )
 
     F_trac_max = np.array(

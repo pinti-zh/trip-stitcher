@@ -12,8 +12,12 @@ OutputModel = TypeVar("OutputModel", bound=BaseModel)
 def get_default_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--input", type=FileType("r"), default=sys.stdin, help="Input file (defaults to stdin)")
-    parser.add_argument("--output", type=FileType("w"), default=sys.stdout, help="Output file (defaults to stdout)")
+    parser.add_argument(
+        "--input", type=FileType("r"), default=sys.stdin, help="Input file (defaults to stdin)"
+    )
+    parser.add_argument(
+        "--output", type=FileType("w"), default=sys.stdout, help="Output file (defaults to stdout)"
+    )
     return parser
 
 
@@ -30,7 +34,9 @@ def collect(input_cls: Type[InputModel], args: Namespace) -> list[InputModel]:
 
 
 def run_pipeline(
-    transform: Callable[[InputModel], OutputModel | list[OutputModel]], input_cls: Type[InputModel], args: Namespace
+    transform: Callable[[InputModel], OutputModel | list[OutputModel]],
+    input_cls: Type[InputModel],
+    args: Namespace,
 ):
     for line in args.input:
         line = line.strip()

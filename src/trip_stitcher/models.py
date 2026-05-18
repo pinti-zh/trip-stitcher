@@ -20,9 +20,7 @@ class Route(BaseModel):
     @staticmethod
     def list_from_dataframe(df: pd.DataFrame) -> list["Route"]:
         route_dict = {}
-        for route_id, name, trip_id in zip(
-            df["route_id"], df["route_short_name"], df["trip_id"]
-        ):
+        for route_id, name, trip_id in zip(df["route_id"], df["route_short_name"], df["trip_id"]):
             if route_id not in route_dict:
                 route_dict[route_id] = {
                     "name": name,
@@ -35,9 +33,7 @@ class Route(BaseModel):
 
         routes = []
         for route_id, data_dict in route_dict.items():
-            routes.append(
-                Route(id=route_id, name=data_dict["name"], trips=data_dict["trips"])
-            )
+            routes.append(Route(id=route_id, name=data_dict["name"], trips=data_dict["trips"]))
         return routes
 
     def find_representative_trip(self, trip_dict: dict[str, "Trip"]):
@@ -132,9 +128,7 @@ class Trip(BaseModel):
             cumulative_distance = [0.0]
             for d in distance:
                 cumulative_distance.append(cumulative_distance[-1] + d)
-            elevation_data = upsample(
-                cumulative_distance, sampled_elevation_data, is_stop
-            )
+            elevation_data = upsample(cumulative_distance, sampled_elevation_data, is_stop)
 
         return TripGeometry(
             lon=lon,
@@ -300,8 +294,7 @@ class DrivingMission(BaseModel):
             )
             trip_stop_time = int(
                 (
-                    str_to_datetime(trip.arrival_times[-1])
-                    - str_to_datetime("00:00:00")
+                    str_to_datetime(trip.arrival_times[-1]) - str_to_datetime("00:00:00")
                 ).total_seconds()
             )
             assert trip_start_time < trip_stop_time
@@ -314,9 +307,7 @@ class DrivingMission(BaseModel):
             depot_charge.append(False)
             in_depot = trip.stops[-1] in depot_ids
         assert all(t1 < t2 for t1, t2 in zip(time[:-1], time[1:]))
-        time, energy_demand, depot_charge = fit_to_24hs(
-            time, energy_demand, depot_charge
-        )
+        time, energy_demand, depot_charge = fit_to_24hs(time, energy_demand, depot_charge)
         return {
             "num_vehicles": num_vehicles,
             "time": time,
@@ -346,9 +337,7 @@ def fit_to_24hs(
     if seconds_in_a_day in time:
         for i, t in enumerate(time):
             if t == seconds_in_a_day:
-                adjusted_time = [v % seconds_in_a_day for v in time[i + 1 :]] + time[
-                    : i + 1
-                ]
+                adjusted_time = [v % seconds_in_a_day for v in time[i + 1 :]] + time[: i + 1]
                 adjusted_energy_demand = energy_demand[i + 1 :] + energy_demand[: i + 1]
                 adjusted_depot_charge = depot_charge[i + 1 :] + depot_charge[: i + 1]
                 return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
@@ -362,16 +351,12 @@ def fit_to_24hs(
                 ed_1 = energy_demand[i] * t_1 / (t_1 + t_2)
                 ed_2 = energy_demand[i] * t_1 / (t_1 + t_2)
                 adjusted_time = (
-                    [v % seconds_in_a_day for v in time[i:]]
-                    + time[:i]
-                    + [seconds_in_a_day]
+                    [v % seconds_in_a_day for v in time[i:]] + time[:i] + [seconds_in_a_day]
                 )
                 adjusted_energy_demand = (
                     [ed_2] + energy_demand[i + 1 :] + energy_demand[:i] + [ed_1]
                 )
-                adjusted_depot_charge = (
-                    depot_charge[i:] + depot_charge[:i] + [depot_charge[i]]
-                )
+                adjusted_depot_charge = depot_charge[i:] + depot_charge[:i] + [depot_charge[i]]
                 return adjusted_time, adjusted_energy_demand, adjusted_depot_charge
 
     # case day needs completion
