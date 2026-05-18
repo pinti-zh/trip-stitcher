@@ -124,6 +124,30 @@ This will find trips near a location and stitches together the first 8 into driv
 
 **⚠️ Warning:** Since `calculate-energy-demand` uses public APIs, an internet connection is required to run the script.
 
+## Code Style
+
+This project uses [ruff](https://github.com/astral-sh/ruff) for formatting and linting (including import sorting). All rules are configured in `pyproject.toml`.
+
+Run the formatter and linter before committing:
+
+```bash
+ruff format .        # auto-format code
+ruff check --fix .   # lint and auto-fix imports + style issues
+```
+
+To enable autoformatting on save in VS Code, add the following to your `.vscode/settings.json` (requires the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)):
+
+```json
+"[python]": {
+  "editor.defaultFormatter": "charliermarsh.ruff",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.ruff": "explicit",
+    "source.organizeImports.ruff": "explicit"
+  }
+}
+```
+
 ## Notebooks
 
 This repository includes Jupyter notebooks designed to help you understand the key concepts behind the project. They provide step-by-step explanations and examples, showing how the code works and how it should be used effectively.  

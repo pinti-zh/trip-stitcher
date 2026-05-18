@@ -12,15 +12,31 @@ def str_to_datetime(value: str, start: datetime = datetime(year=2025, month=1, d
     hour, minute, second = [int(v) for v in value.split(":")]
     if hour >= 24:
         next_day = start + timedelta(days=1)
-        return datetime(year=next_day.year, month=next_day.month, day=next_day.day, hour=hour - 24, minute=minute, second=second)
+        return datetime(
+            year=next_day.year,
+            month=next_day.month,
+            day=next_day.day,
+            hour=hour - 24,
+            minute=minute,
+            second=second,
+        )
     else:
-        return datetime(year=start.year, month=start.month, day=start.day, hour=hour, minute=minute, second=second)
+        return datetime(
+            year=start.year,
+            month=start.month,
+            day=start.day,
+            hour=hour,
+            minute=minute,
+            second=second,
+        )
 
 
 def datetime_to_str(dt: datetime, is_next_day: bool = False) -> str:
     datetime_str = dt.strftime("%H:%M:%S")
     if is_next_day:
-        datetime_str = str(int(datetime_str.split(":")[0]) + 24) + ":" + ":".join(datetime_str.split(":")[1:])
+        datetime_str = (
+            str(int(datetime_str.split(":")[0]) + 24) + ":" + ":".join(datetime_str.split(":")[1:])
+        )
     return datetime_str
 
 

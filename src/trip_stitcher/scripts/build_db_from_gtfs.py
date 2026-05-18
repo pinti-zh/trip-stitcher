@@ -5,7 +5,19 @@ from time import perf_counter
 
 import pandas as pd
 from loguru import logger
-from sqlalchemy import Column, Engine, Float, Index, Integer, MetaData, Table, Text, create_engine, inspect, select
+from sqlalchemy import (
+    Column,
+    Engine,
+    Float,
+    Index,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    create_engine,
+    inspect,
+    select,
+)
 
 
 def load_gtfs_table(engine: Engine, table: Table, file_path: Path) -> None:
@@ -19,7 +31,9 @@ def load_gtfs_table(engine: Engine, table: Table, file_path: Path) -> None:
 def main():
     parser = ArgumentParser()
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--gtfs-directory", type=str, dest="gtfs_directory", default="data/2025_google_transit")
+    parser.add_argument(
+        "--gtfs-directory", type=str, dest="gtfs_directory", default="data/2025_google_transit"
+    )
     parser.add_argument("--db-name", type=str, dest="db_name", default="gtfs")
     args = parser.parse_args()
 
