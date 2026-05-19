@@ -1,3 +1,19 @@
+# build_db_from_gtfs.py
+#
+# Reads raw GTFS CSV files from a directory and imports them into a SQLite
+# database.  The script creates the relevant tables (agency, routes, trips,
+# stop_times, stops, calendar, calendar_dates) and bulk-inserts all rows.
+#
+# Usage:
+#   python build_db_from_gtfs.py [--gtfs-directory DIR] [--db-name NAME] [--debug]
+#
+# Arguments:
+#   --gtfs-directory  Path to the directory containing the GTFS CSV files
+#                     (default: data/2025_google_transit)
+#   --db-name         Base name of the output SQLite file, without extension
+#                     (default: gtfs  →  gtfs.db)
+#   --debug           Enable verbose DEBUG-level logging
+
 import sys
 from argparse import ArgumentParser
 from pathlib import Path

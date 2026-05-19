@@ -1,3 +1,24 @@
+# compare_speed_profile_opt.py
+#
+# Standalone script that compares two speed-profile optimisation approaches
+# for a hard-coded sample trip (route 220):
+#
+#   1. Reference  — ocsept's TimeOptimalStrategy (IPOPT via optool)
+#   2. Local      — re-implemented CasADi NLP inside EnergyDemandEstimator
+#
+# The script reports travel-time accuracy and runtime speedup, then renders
+# two Plotly figures: a speed-profile comparison and an acceleration-profile
+# comparison with active constraint limits (torque, power, comfort, traction).
+#
+# Hard-coded parameters at the top of the file control the bus type
+# (BUS_TYPE) and auxiliary power consumption (AUX_POWER).
+#
+# Usage:
+#   python compare_speed_profile_opt.py
+#
+# Note: requires ocsept and optool packages in addition to the standard
+#       trip_stitcher dependencies.
+
 import time
 from contextlib import contextmanager
 

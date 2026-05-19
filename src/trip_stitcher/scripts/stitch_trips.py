@@ -1,3 +1,23 @@
+# stitch_trips.py
+#
+# Pipeline script that reads Trip objects from a JSONL input stream and groups
+# them into DrivingMission objects by stitching together consecutive trips
+# that share the same terminal stop (i.e. the end of one trip coincides with
+# the start of the next).
+#
+# Optionally renders a Gantt-style matplotlib/seaborn plot showing each
+# driving mission as a coloured line over time.
+#
+# Usage:
+#   python stitch_trips.py --data-file FILE
+#                          [--input FILE] [--output FILE]
+#                          [--plot] [--debug]
+#
+# Arguments:
+#   --data-file   Path to the Parquet file used to resolve stop metadata
+#   --plot        Display a visual timeline of the stitched driving missions
+#   --debug       Enable verbose DEBUG-level logging
+
 from argparse import Namespace
 
 import matplotlib.pyplot as plt

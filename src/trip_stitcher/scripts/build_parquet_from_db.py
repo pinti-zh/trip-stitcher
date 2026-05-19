@@ -1,3 +1,24 @@
+# build_parquet_from_db.py
+#
+# Queries a GTFS SQLite database (produced by build_db_from_gtfs.py) for a
+# specific agency and service date, then exports the resulting stop-time data
+# to a Parquet file.  Route names are matched with Levenshtein distance to
+# handle minor naming differences.
+#
+# Usage:
+#   python build_parquet_from_db.py [--db-name NAME] [--agency ID_OR_NAME]
+#                                   [--date YYYYMMDD]
+#                                   [--query-output-file FILE]
+#                                   [--chunk-size N] [--debug]
+#
+# Arguments:
+#   --db-name             Base name of the SQLite database file (default: gtfs)
+#   --agency              Agency id or name to filter by (default: 801)
+#   --date                Service date in YYYYMMDD format (default: 20250113)
+#   --query-output-file   Path for the output Parquet file
+#   --chunk-size          Number of rows per insert chunk (default: 100 000)
+#   --debug               Enable verbose DEBUG-level logging
+
 import sys
 from argparse import ArgumentParser
 from datetime import date, datetime
