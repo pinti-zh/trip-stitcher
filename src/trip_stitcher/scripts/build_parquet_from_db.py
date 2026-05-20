@@ -4,12 +4,13 @@ from datetime import date, datetime
 from pathlib import Path
 from time import perf_counter
 
-import Levenshtein
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from loguru import logger
 from sqlalchemy import MetaData, create_engine, select
+
+from trip_stitcher.utils import match_agency_string
 
 
 def is_valid_yyyymmdd(date_str):
@@ -61,37 +62,9 @@ def main():
 
     metadata.reflect(engine)
 
-    agency = metadata.tables["agency"]
-    agency_stmt = select(agency.c.agency_id, agency.c.agency_name)
-    agency_id_to_name = {}
-    agency_name_to_id = {}
-    with engine.connect() as conn:
-        for result in conn.execute(agency_stmt):
-            agency_id_to_name[result.agency_id] = result.agency_name
-            agency_name_to_id[result.agency_name] = result.agency_id
+    agency_id, agency_name = match_agency_string(args.agency, engine, metadata)
 
-    closest_agency_name = sorted(
-        agency_name_to_id.keys(),
-        key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x),
-    )[0]
-    closest_agency_id = sorted(
-        agency_id_to_name.keys(),
-        key=lambda x: Levenshtein.distance(x.lower(), args.agency.lower()) / len(x),
-    )[0]
-
-    name_distance = Levenshtein.distance(closest_agency_name.lower(), args.agency.lower()) / len(
-        closest_agency_name
-    )
-    id_distance = Levenshtein.distance(closest_agency_id.lower(), args.agency.lower()) / len(
-        closest_agency_id
-    )
-
-    if name_distance < id_distance:
-        agency_id = agency_name_to_id[closest_agency_name]
-    else:
-        agency_id = closest_agency_id
-
-    logger.info(f"using agency {agency_id}: {agency_id_to_name[agency_id]}")
+    logger.info(f"using agency {agency_id}: {agency_name}")
 
     calendar = metadata.tables["calendar"]
     calendar_dates = metadata.tables["calendar_dates"]

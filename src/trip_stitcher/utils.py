@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import numpy as np
 from loguru import logger
 from skimage.restoration import denoise_tv_chambolle
+from sqlalchemy import Engine, MetaData, select
+import Levenshtein
 
 
 def str_to_datetime(value: str, start: datetime = datetime(year=2025, month=1, day=1)) -> datetime:
@@ -86,3 +88,37 @@ def upsample(x: list[float], samples: list[float], has_sample: list[bool]) -> li
 
     up_sampled = np.interp(x, [v for v, hs in zip(x, has_sample) if hs], samples)
     return up_sampled.tolist()
+
+
+def match_agency_string(query: str, engine: Engine, metadata: MetaData) -> tuple[str, str]:
+    agency = metadata.tables["agency"]
+    agency_stmt = select(agency.c.agency_id, agency.c.agency_name)
+    agency_id_to_name = {}
+    agency_name_to_id = {}
+    with engine.connect() as conn:
+        for result in conn.execute(agency_stmt):
+            agency_id_to_name[result.agency_id] = result.agency_name
+            agency_name_to_id[result.agency_name] = result.agency_id
+
+    closest_agency_name = sorted(
+        agency_name_to_id.keys(),
+        key=lambda x: Levenshtein.distance(x.lower(), query.lower()) / len(x),
+    )[0]
+    closest_agency_id = sorted(
+        agency_id_to_name.keys(),
+        key=lambda x: Levenshtein.distance(x.lower(), query.lower()) / len(x),
+    )[0]
+
+    name_distance = Levenshtein.distance(closest_agency_name.lower(), query.lower()) / len(
+        closest_agency_name
+    )
+    id_distance = Levenshtein.distance(closest_agency_id.lower(), query.lower()) / len(
+        closest_agency_id
+    )
+
+    if name_distance < id_distance:
+        agency_id = agency_name_to_id[closest_agency_name]
+    else:
+        agency_id = closest_agency_id
+
+    return agency_id, agency_id_to_name[agency_id]
