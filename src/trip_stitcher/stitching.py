@@ -40,7 +40,7 @@ def driving_mission_ends_at_trip_start(driving_mission: DrivingMission, trip: Tr
 def driving_mission_ends_before_trip(driving_mission: DrivingMission, trip: Trip) -> bool:
     if driving_mission.end_time is None:
         return True
-    return str_to_datetime(trip.arrival_times[0]) > driving_mission.end_time
+    return str_to_datetime(trip.arrival_times[0]) >= driving_mission.end_time
 
 
 def trip_within_vehicle_energy_capacity(
