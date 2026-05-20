@@ -8,6 +8,16 @@ from scipy.sparse.csgraph import maximum_bipartite_matching
 
 from trip_stitcher.models import DrivingMission, Route, Stop, Trip
 from trip_stitcher.utils import datetime_to_str, str_to_datetime
+from trip_stitcher.vehicles import maxi, mega, mini
+
+DEFAULT_VEHICLE_CAPACITY_MAP: dict[str, float] = {
+    "maxi": maxi.bus.battery.capacity.m_as("J")
+    * (maxi.bus.battery.soc_max - maxi.bus.battery.soc_min),
+    "mega": mega.bus.battery.capacity.m_as("J")
+    * (mega.bus.battery.soc_max - mega.bus.battery.soc_min),
+    "mini": mini.bus.battery.capacity.m_as("J")
+    * (mini.bus.battery.soc_max - mini.bus.battery.soc_min),
+}
 
 
 def driving_mission_and_trip_match_vehicles(
@@ -15,7 +25,10 @@ def driving_mission_and_trip_match_vehicles(
 ) -> bool:
     if route_dict is None:
         raise ValueError("route_dict must not be None")
-    return route_dict[trip.route] == route_dict[driving_mission.trips[-1].route]
+    return (
+        route_dict[trip.route].vehicle_type
+        == route_dict[driving_mission.trips[-1].route].vehicle_type
+    )
 
 
 def driving_mission_ends_at_trip_start(driving_mission: DrivingMission, trip: Trip) -> bool:
@@ -30,18 +43,26 @@ def driving_mission_ends_before_trip(driving_mission: DrivingMission, trip: Trip
     return str_to_datetime(trip.arrival_times[0]) > driving_mission.end_time
 
 
-def trip_within_energy_capacity(
-    driving_mission: DrivingMission, trip: Trip, max_capacity: float = 300 * 3.6e6
+def trip_within_vehicle_energy_capacity(
+    driving_mission: DrivingMission,
+    trip: Trip,
+    route_dict: dict[str, Route],
+    vehicle_capacity_map: dict[str, float],
 ) -> bool:
     if trip.estimated_energy_demand is None:
-        return True
+        raise ValueError(f"trip '{trip.id}' has no estimated energy demand")
+    vehicle_type = route_dict[trip.route].vehicle_type
+    max_capacity = vehicle_capacity_map.get(vehicle_type)
+    if max_capacity is None:
+        raise ValueError(f"no capacity defined for vehicle type '{vehicle_type}'")
     if driving_mission.end_time is None:
         return trip.estimated_energy_demand <= max_capacity
     return trip.estimated_energy_demand + driving_mission.energy_demand <= max_capacity
 
 
 def build_default_is_addable(
-    route_dict: dict[str, Route] | None = None, max_capacity: float | None = None
+    route_dict: dict[str, Route] | None = None,
+    vehicle_capacity_map: dict[str, float] | None = None,
 ) -> Callable[[DrivingMission, Trip], bool]:
     """
     Build a composite predicate to determine whether a trip can be added
@@ -53,9 +74,12 @@ def build_default_is_addable(
 
     Args:
         route_dict: Optional mapping used to enforce vehicle compatibility
-            between driving missions and trips.
-        max_capacity: Optional upper bound for energy capacity; ensures that
-            the trip does not exceed the allowed capacity.
+            between driving missions and trips, and to look up vehicle type
+            for energy capacity checks.
+        vehicle_capacity_map: Mapping from vehicle type string to usable energy
+            capacity in joules. Defaults to DEFAULT_VEHICLE_CAPACITY_MAP when
+            route_dict is provided. Supply a custom map to support additional
+            vehicle types beyond the built-in maxi/mega/mini.
 
     Returns:
         A callable that takes a DrivingMission and a Trip and returns True
@@ -68,9 +92,19 @@ def build_default_is_addable(
     ]
 
     if route_dict is not None:
+        cap_map = (
+            vehicle_capacity_map
+            if vehicle_capacity_map is not None
+            else DEFAULT_VEHICLE_CAPACITY_MAP
+        )
         predicates.append(partial(driving_mission_and_trip_match_vehicles, route_dict=route_dict))
-    if max_capacity is not None:
-        predicates.append(partial(trip_within_energy_capacity, max_capacity=max_capacity))
+        predicates.append(
+            partial(
+                trip_within_vehicle_energy_capacity,
+                route_dict=route_dict,
+                vehicle_capacity_map=cap_map,
+            )
+        )
 
     def is_addable(dm: DrivingMission, t: Trip) -> bool:
         return all(p(dm, t) for p in predicates)
