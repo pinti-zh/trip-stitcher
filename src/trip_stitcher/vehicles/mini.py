@@ -7,7 +7,7 @@ from ocsept.models.components.vehicles import BatteryBus
 chassis = Chassis(
     length="5.94m",
     weight="2.7t",
-    gvm="4.5t",
+    gvm="10t",
     aerodynamic_drag_area="2.5m^2",
     rolling_friction=0.01,
     wheel_inertia=[(4, "8kg*m^2")],
