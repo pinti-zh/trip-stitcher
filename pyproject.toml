@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 build-db = "trip_stitcher.scripts.build_db_from_gtfs:main"
+filter-db = "trip_stitcher.scripts.filter_db_by_agency:main"
 build-parquet = "trip_stitcher.scripts.build_parquet_from_db:main"
 find-trips = "trip_stitcher.scripts.find_trips:main"
 calculate-energy-demand = "trip_stitcher.scripts.calculate_energy_demand:main"
