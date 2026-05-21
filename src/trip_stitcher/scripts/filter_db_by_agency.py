@@ -39,6 +39,12 @@ def main():
     )
     args = parser.parse_args()
 
+    logger.remove()
+    if args.debug:
+        logger.add(sys.stderr, level="DEBUG")
+    else:
+        logger.add(sys.stderr, level="INFO")
+
     if not args.input_db.exists():
         logger.error(f"input_db does not exist: {args.input_db}")
         sys.exit(1)
