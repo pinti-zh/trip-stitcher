@@ -30,13 +30,15 @@ powertrain = ElectricPowertrain(
     final_drive_transmission_ratio=6.2,
 )
 battery = Battery(
-    weight="1800kg",
-    chemistry=BatteryChemistry.LTO,
-    capacity="120kWh",
-    c_rate_limit_continuous_charging="4.1/h",
-    c_rate_limit_continuous_discharging="4.1/h",
-    c_rate_limit_peak_charging="6/h",
-    c_rate_limit_peak_discharging="7/h",
+    weight="3892kg",
+    chemistry=BatteryChemistry.NMC,
+    capacity="556kWh",
+    c_rate_limit_continuous_charging="1/h",
+    c_rate_limit_continuous_discharging="1/h",
+    c_rate_limit_peak_charging="2/h",
+    c_rate_limit_peak_discharging="2/h",
+    soc_min=0.2,
+    soc_max=0.8,
 )
 
 bus = BatteryBus(chassis=chassis, powertrain=powertrain, battery=battery)
