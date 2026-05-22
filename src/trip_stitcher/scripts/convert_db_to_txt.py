@@ -1,35 +1,62 @@
 import csv
 import os
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
+from loguru import logger
 from sqlalchemy import MetaData, create_engine, text
 
+TABLES = [
+    "agency",
+    "routes",
+    "trips",
+    "stop_times",
+    "stops",
+    "calendar",
+    "calendar_dates",
+]
 
-def export_db_to_gtfs(db_url: str, output_dir: str):
-    """
-    Exports all tables from a SQLite/Postgres database back into standard GTFS .txt files.
-    """
-    # 1. Ensure the output directory exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        print(f"Created output directory: {output_dir}")
 
-    # 2. Bind engine and reflect the schema to discover what tables exist
-    engine = create_engine(db_url)
+def main():
+    parser = ArgumentParser()
+    parser.add_argument("--debug", action="store_true", help="enable debug logging")
+    parser.add_argument(
+        "--input-db", type=Path, dest="input_db", required=True, help="path to input database"
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, dest="output_dir", required=True, help="path to output directory"
+    )
+    args = parser.parse_args()
+
+    logger.remove()
+    if args.debug:
+        logger.add(sys.stderr, level="DEBUG")
+    else:
+        logger.add(sys.stderr, level="INFO")
+
+    if not args.input_db.exists():
+        logger.error(f"input_db does not exist: {args.input_db}")
+        sys.exit(1)
+
+    engine = create_engine(f"sqlite:///{args.input_db}")
     metadata = MetaData()
     metadata.reflect(bind=engine)
 
-    print(f"Found {len(metadata.tables)} tables to export.\n")
+    assert all(table in metadata.tables.keys() for table in TABLES)
+    logger.debug("all tables found")
+
+    if not args.output_dir.exists():
+        os.makedirs(args.output_dir)
 
     # 3. Stream each table directly into its respective text file
     with engine.connect() as conn:
-        for table_name in metadata.tables.keys():
+        for table_name in TABLES:
             # GTFS file naming standard
             file_name = f"{table_name}.txt"
-            file_path = os.path.join(output_dir, file_name)
+            file_path = args.output_dir / file_name
 
-            print(f"Exporting '{table_name}' to {file_name}...")
+            logger.debug(f"exporting '{table_name}' to {file_name}...")
 
             # Execute query to pull all filtered rows
             result = conn.execute(text(f"SELECT * FROM {table_name}"))
@@ -38,7 +65,7 @@ def export_db_to_gtfs(db_url: str, output_dir: str):
             headers = list(result.keys())
 
             if not headers:
-                print(f"  Skipping '{table_name}' — table has no columns.")
+                logger.warning(f"  Skipping '{table_name}' — table has no columns.")
                 continue
 
             # Open file and write content using standard CSV formats required by GTFS spec
@@ -59,28 +86,9 @@ def export_db_to_gtfs(db_url: str, output_dir: str):
                     # Write rows directly to file block by block
                     writer.writerows(rows)
 
-            print(f"  Successfully wrote {file_name}")
+            logger.debug(f"  successfully wrote {file_name}")
 
-    print("\nAll tables exported successfully back to text format!")
-
-def main():
-    parser = ArgumentParser()
-    parser.add_argument("--debug", action="store_true", help="enable debug logging")
-    parser.add_argument(
-        "--input-db", type=Path, dest="input_db", required=True, help="path to input database"
-    )
-    parser.add_argument(
-        "--output-dir", type=Path, dest="output_dir", required=True, help="path to output directory"
-    )
-    args = parser.parse_args()
-
-    # Your small, filtered database file path
-    SMALL_DB = "sqlite:///small_local_gtfs.db"
-
-    # Target directory where you want your filtered GTFS files to live
-    OUTPUT_FOLDER = "./filtered_gtfs_feed"
-
-    export_db_to_gtfs(db_url=SMALL_DB, output_dir=OUTPUT_FOLDER)
+    logger.info(f"all tables exported successfully back to text format and saved to {args.output_dir}/")
 
 
 if __name__ == "__main__":
