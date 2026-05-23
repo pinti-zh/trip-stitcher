@@ -173,6 +173,8 @@ def add_depot_trips(
     | None = None,  # function that maps depot ids to timedelta
     energy_demand_function: Callable[[str, str], float]
     | None = None,  # function that maps depot ids to energy demand
+    covered_distance_function: Callable[[str, str], float]
+    | None = None,  # function that maps depot ids to covered distance in metres
 ) -> list[DrivingMission]:
     for driving_mission in driving_missions:
         assert driving_mission.trips is not None and len(driving_mission.trips) > 0
@@ -194,6 +196,13 @@ def add_depot_trips(
             energy_to_first_stop = 0.0
             energy_from_last_stop = 0.0
 
+        if covered_distance_function is not None:
+            distance_to_first_stop = covered_distance_function(depot.id, first_stop)
+            distance_from_last_stop = covered_distance_function(depot.id, last_stop)
+        else:
+            distance_to_first_stop = 0.0
+            distance_from_last_stop = 0.0
+
         departure_datetime = (
             str_to_datetime(driving_mission.trips[0].arrival_times[0]) - time_to_first_stop
         )
@@ -211,6 +220,7 @@ def add_depot_trips(
             stops=[depot.id, first_stop],
             arrival_times=[departure_time, driving_mission.trips[0].arrival_times[0]],
             estimated_energy_demand=energy_to_first_stop,
+            covered_distance=distance_to_first_stop,
         )
 
         trip_to_depot = Trip(
@@ -219,6 +229,7 @@ def add_depot_trips(
             stops=[last_stop, depot.id],
             arrival_times=[driving_mission.trips[-1].arrival_times[-1], arrival_time],
             estimated_energy_demand=energy_from_last_stop,
+            covered_distance=distance_from_last_stop,
         )
         driving_mission.trips = [trip_from_depot] + driving_mission.trips
         driving_mission.add_trip(trip_to_depot)
