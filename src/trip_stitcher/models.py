@@ -2,6 +2,7 @@ import uuid
 from collections import Counter
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import requests
 from ocsept.models.transport.itinerary import Segment, TravelItinerary, Waypoint
@@ -78,6 +79,81 @@ class TripGeometry(BaseModel):
                 Waypoint(maximum_speed_limit=f"{waypoint_sl} km/h", elevation=f"{el} m")
             )
         return TravelItinerary.from_elements(*elements)
+
+
+class RouteProfile:
+    """Lightweight route profile for energy demand calculation.
+
+    Stores geometry constraints as plain numpy arrays in SI units (metres, m/s,
+    radians), replacing the heavier TravelItinerary in performance-critical paths.
+    Payload and auxiliary power are not modelled here; callers should treat them
+    as zero.
+    """
+
+    _MIN_SPEED_M_S = 0.01  # m/s — matches ocsept Segment.minimum_speed_limit default
+
+    def __init__(
+        self,
+        waypoint_distances: np.ndarray,
+        segment_max_speeds: np.ndarray,
+        stop_mask: np.ndarray,
+        elevations: np.ndarray,
+    ) -> None:
+        self._waypoint_distances = waypoint_distances  # (M+1,) m
+        self._segment_max_speeds = segment_max_speeds  # (M,)  m/s
+        self._stop_mask = stop_mask  # (M+1,) bool
+        self._elevations = elevations  # (M+1,) m
+
+    @classmethod
+    def from_trip_geometry(cls, geom: "TripGeometry") -> "RouteProfile":
+        """Build a RouteProfile from TripGeometry, mirroring the d<=0 skip logic
+        of TripGeometry.create_itinerary."""
+        valid_idx = [i for i, d in enumerate(geom.distance) if d > 0]
+        seg_lengths = np.array([geom.distance[i] for i in valid_idx])
+        seg_max_speeds = np.array([geom.speed_limit[i] for i in valid_idx]) / 3.6  # km/h → m/s
+        elevations = [geom.elevation[0]]
+        stop_mask = [True]
+        for i in valid_idx:
+            elevations.append(geom.elevation[i + 1])
+            stop_mask.append(geom.is_stop[i + 1])
+        return cls(
+            waypoint_distances=np.concatenate([[0.0], np.cumsum(seg_lengths)]),
+            segment_max_speeds=seg_max_speeds,
+            stop_mask=np.array(stop_mask, dtype=bool),
+            elevations=np.array(elevations),
+        )
+
+    def _segment_index(self, s: np.ndarray) -> np.ndarray:
+        """Index of the segment each sample falls in (previous-fill rule)."""
+        idx = np.searchsorted(self._waypoint_distances[:-1], s, side="right") - 1
+        return np.clip(idx, 0, len(self._segment_max_speeds) - 1)
+
+    def get_sample_distances(self, step_m: float = 5.0) -> np.ndarray:
+        """Sample distances (m) at even intervals merged with waypoint positions."""
+        total = self._waypoint_distances[-1]
+        evenly_spaced = np.arange(0.0, total, step_m)
+        return np.unique(np.concatenate([evenly_spaced, self._waypoint_distances]))
+
+    def get_max_speed_limit(self, s: np.ndarray) -> np.ndarray:
+        """Maximum speed limit at each sample distance (m/s)."""
+        result = self._segment_max_speeds[self._segment_index(s)].copy()
+        stop_dists = self._waypoint_distances[self._stop_mask]
+        result[np.isin(s, stop_dists)] = 0.0
+        return result
+
+    def get_min_speed_limit(self, s: np.ndarray) -> np.ndarray:
+        """Minimum speed limit at each sample distance (m/s)."""
+        result = np.full(len(s), self._MIN_SPEED_M_S)
+        stop_dists = self._waypoint_distances[self._stop_mask]
+        result[np.isin(s, stop_dists)] = 0.0
+        return result
+
+    def get_inclination(self, s: np.ndarray) -> np.ndarray:
+        """Road inclination at each sample distance (radians)."""
+        dz = np.diff(self._elevations)
+        dx = np.diff(self._waypoint_distances)
+        grade = dz / dx
+        return np.arctan(grade[self._segment_index(s)])
 
 
 class Trip(BaseModel):

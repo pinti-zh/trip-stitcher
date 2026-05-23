@@ -8,7 +8,7 @@ from ocsept.simulation.qss import LongitudinalVehicleDynamics
 from optool.uom import Quantity
 
 from trip_stitcher.elevation import ElevationOracle
-from trip_stitcher.models import Stop, Trip
+from trip_stitcher.models import RouteProfile, Stop, Trip
 from trip_stitcher.utils import str_to_datetime, suppress_stdout
 from trip_stitcher.vehicles import maxi, mega, mini
 
@@ -29,23 +29,23 @@ class EnergyDemandEstimator:
         self.cache: dict[tuple[str, ...], dict[str, float]] = {}
 
     @staticmethod
-    def _compute_speed_profile(itinerary, bus, comfort) -> SpeedProfile:
+    def _compute_speed_profile(itinerary: RouteProfile, bus, comfort) -> SpeedProfile:
         """Compute a time-optimal speed profile via a direct CasADi/IPOPT NLP."""
         # ------------------------------------------------------------------
         # 1. Sample distances (SI: metres)
         # ------------------------------------------------------------------
-        s_qty = itinerary.get_sample_distances("5 m")
-        s = s_qty.m_as("m")  # np.ndarray, shape (N,)
+        s = itinerary.get_sample_distances(5.0)  # np.ndarray, shape (N,)
         N = len(s)
 
         # ------------------------------------------------------------------
         # 2. Per-sample constraints from itinerary
         # ------------------------------------------------------------------
-        v_max = itinerary.get_speed_limit(s_qty, "maximum").m_as("m/s")  # (N,)
-        v_min = itinerary.get_speed_limit(s_qty, "minimum").m_as("m/s")  # (N,)
-        alpha = itinerary.get_inclination(s_qty).m_as("rad")  # (N,)
-        m_payload = itinerary.get_payload(s_qty).m_as("kg")  # (N,)
-        p_aux = itinerary.get_peak_auxiliary_power(s_qty).m_as("W")  # (N,)
+        v_max = itinerary.get_max_speed_limit(s)  # (N,) m/s
+        v_min = itinerary.get_min_speed_limit(s)  # (N,) m/s
+        alpha = itinerary.get_inclination(s)  # (N,) rad
+        # payload and auxiliary power are zero for all modelled routes
+        m_payload = np.zeros(N)  # (N,) kg
+        p_aux = np.zeros(N)  # (N,) W
 
         # ------------------------------------------------------------------
         # 3. Bus parameters
@@ -202,7 +202,7 @@ class EnergyDemandEstimator:
         )
         assert max_inclination < 20
 
-        itinerary = trip_geometry.create_itinerary()
+        itinerary = RouteProfile.from_trip_geometry(trip_geometry)
 
         bus = None
         match bus_type:
@@ -228,7 +228,9 @@ class EnergyDemandEstimator:
             name="Fastest possible travel speed",
             time=speed_profile.time,
             speed=speed_profile.speed,
-            inclination=itinerary.get_inclination(speed_profile.distance),
+            inclination=Quantity(
+                itinerary.get_inclination(speed_profile.distance.m_as("m")), "rad"
+            ),
             payload="0 kg",
         )
 
