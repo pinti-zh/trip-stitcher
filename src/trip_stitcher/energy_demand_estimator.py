@@ -29,7 +29,9 @@ class EnergyDemandEstimator:
         self.cache: dict[tuple[str, ...], dict[str, float]] = {}
 
     @staticmethod
-    def _compute_speed_profile(itinerary: RouteProfile, bus, comfort) -> SpeedProfile:
+    def _compute_speed_profile(
+        itinerary: RouteProfile, bus, comfort, payload: float = 0.0, aux_power: float = 0.0
+    ) -> SpeedProfile:
         """Compute a time-optimal speed profile via a direct CasADi/IPOPT NLP."""
         # ------------------------------------------------------------------
         # 1. Sample distances (SI: metres)
@@ -44,8 +46,8 @@ class EnergyDemandEstimator:
         v_min = itinerary.get_min_speed_limit(s)  # (N,) m/s
         alpha = itinerary.get_inclination(s)  # (N,) rad
         # payload and auxiliary power are zero for all modelled routes
-        m_payload = np.zeros(N)  # (N,) kg
-        p_aux = np.zeros(N)  # (N,) W
+        m_payload = np.full(N, payload)  # (N,) kg
+        p_aux = np.full(N, aux_power)  # (N,) W
 
         # ------------------------------------------------------------------
         # 3. Bus parameters
@@ -178,9 +180,9 @@ class EnergyDemandEstimator:
         )
 
     def calculate_energy_demand(
-        self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0
+        self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0, payload: float = 0.0
     ) -> float:
-        cache_key = tuple(trip.stops + [str(aux_power), str(bus_type)])
+        cache_key = tuple(trip.stops + [str(aux_power), str(bus_type), str(payload)])
         if cache_key in self.cache.keys():
             cached = self.cache[cache_key]
             trip.estimated_energy_demand = cached["energy"]
@@ -218,7 +220,9 @@ class EnergyDemandEstimator:
 
         comfort = RidingComfort()
 
-        speed_profile = self._compute_speed_profile(itinerary, bus, comfort)
+        speed_profile = self._compute_speed_profile(
+            itinerary, bus, comfort, payload=payload, aux_power=aux_power
+        )
 
         assert speed_profile.distance is not None
         assert speed_profile.speed is not None
@@ -231,7 +235,7 @@ class EnergyDemandEstimator:
             inclination=Quantity(
                 itinerary.get_inclination(speed_profile.distance.m_as("m")), "rad"
             ),
-            payload="0 kg",
+            payload=f"{payload} kg",
         )
 
         with suppress_stdout():
