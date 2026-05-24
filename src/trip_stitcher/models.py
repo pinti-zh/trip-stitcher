@@ -271,7 +271,7 @@ class Stop(BaseModel):
         depot_id = uuid.uuid4().hex
         return Stop(
             id=depot_id,
-            name=f"Depot-{depot_id[:4]}",
+            name=f"Virtual Depot ({depot_id[:4]})",
             lon=sum(stop.lon for stop in stops) / len(stops),
             lat=sum(stop.lat for stop in stops) / len(stops),
         )

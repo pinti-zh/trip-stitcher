@@ -215,7 +215,7 @@ def add_depot_trips(
         arrival_time = datetime_to_str(arrival_datetime, is_next_day=arrival_datetime.day == 2)
 
         trip_from_depot = Trip(
-            id=uuid.uuid4().hex,
+            id=f"virtual-depot-trip-{uuid.uuid4().hex[:4]}",
             route=driving_mission.trips[0].route,
             stops=[depot.id, first_stop],
             arrival_times=[departure_time, driving_mission.trips[0].arrival_times[0]],
@@ -224,7 +224,7 @@ def add_depot_trips(
         )
 
         trip_to_depot = Trip(
-            id=uuid.uuid4().hex,
+            id=f"virtual-depot-trip-{uuid.uuid4().hex[:4]}",
             route=driving_mission.trips[0].route,
             stops=[last_stop, depot.id],
             arrival_times=[driving_mission.trips[-1].arrival_times[-1], arrival_time],
