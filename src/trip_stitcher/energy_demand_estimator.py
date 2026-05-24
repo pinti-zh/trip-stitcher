@@ -8,7 +8,7 @@ from ocsept.simulation.qss import LongitudinalVehicleDynamics
 from optool.uom import Quantity
 
 from trip_stitcher.elevation import ElevationOracle
-from trip_stitcher.models import RouteProfile, Stop, Trip
+from trip_stitcher.models import RouteProfile, Stop, Trip, TripProfile
 from trip_stitcher.utils import str_to_datetime, suppress_stdout
 from trip_stitcher.vehicles import maxi, mega, mini
 
@@ -26,7 +26,9 @@ class EnergyDemandEstimator:
             (stop.id, stop) for stop in Stop.list_from_dataframe(df)
         )
         self.elevation_oracle = ElevationOracle()
-        self.cache: dict[tuple[str, ...], dict[str, float]] = {}
+        self.cache: dict[
+            tuple[str, ...], tuple[float, float, TripProfile]
+        ] = {}  # (energy, distance, profile)
 
     @staticmethod
     def _compute_speed_profile(
@@ -183,11 +185,12 @@ class EnergyDemandEstimator:
         self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0, payload: float = 0.0
     ) -> float:
         cache_key = tuple(trip.stops + [str(aux_power), str(bus_type), str(payload)])
-        if cache_key in self.cache.keys():
-            cached = self.cache[cache_key]
-            trip.estimated_energy_demand = cached["energy"]
-            trip.covered_distance = cached["distance"]
-            return cached["energy"]
+        if cache_key in self.cache:
+            energy, distance, profile = self.cache[cache_key]
+            trip.estimated_energy_demand = energy
+            trip.covered_distance = distance
+            trip.profile = profile
+            return energy
 
         trip_geometry = trip.download_geometry(
             self.stop_dict, elevation_oracle=self.elevation_oracle
@@ -256,7 +259,16 @@ class EnergyDemandEstimator:
 
         total_energy = propulsion_energy.magnitude + aux_energy.magnitude
         distance = sum(trip_geometry.distance)
-        self.cache[cache_key] = {"energy": total_energy, "distance": distance}
+        trip.profile = TripProfile(
+            speed_distance_m=speed_profile.distance.m_as("m").tolist(),
+            speed_ms=speed_profile.speed.m_as("m/s").tolist(),
+            speed_time_s=speed_profile.time.m_as("s").tolist(),
+            geo_cumulative_distance_m=trip_geometry.cumulative_distance,
+            geo_elevation_m=trip_geometry.elevation,
+            geo_lon=trip_geometry.lon,
+            geo_lat=trip_geometry.lat,
+        )
+        self.cache[cache_key] = (total_energy, distance, trip.profile)
         trip.estimated_energy_demand = total_energy
         trip.covered_distance = distance
         return total_energy

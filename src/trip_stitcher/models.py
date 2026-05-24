@@ -81,6 +81,30 @@ class TripGeometry(BaseModel):
         return TravelItinerary.from_elements(*elements)
 
 
+class TripProfile(BaseModel):
+    """Speed and elevation profile computed during energy demand estimation.
+
+    All arrays are in SI units and share the same positional index.
+    ``speed_*`` arrays come from the time-optimal CasADi/IPOPT speed profile.
+    ``geo_*`` arrays come from the OSRM geometry + elevation download.
+    """
+
+    speed_distance_m: list[float]
+    """Cumulative distance at each speed-profile sample point, in metres."""
+    speed_ms: list[float]
+    """Speed at each speed-profile sample point, in m/s."""
+    speed_time_s: list[float]
+    """Cumulative elapsed time at each speed-profile sample point, in seconds."""
+    geo_cumulative_distance_m: list[float]
+    """Cumulative distance at each geometry waypoint, in metres (starts at 0.0)."""
+    geo_elevation_m: list[float]
+    """Elevation at each geometry waypoint, in metres above sea level."""
+    geo_lon: list[float]
+    """Longitude at each geometry waypoint (decimal degrees)."""
+    geo_lat: list[float]
+    """Latitude at each geometry waypoint (decimal degrees)."""
+
+
 class RouteProfile:
     """Lightweight route profile for energy demand calculation.
 
@@ -163,6 +187,7 @@ class Trip(BaseModel):
     arrival_times: list[str]
     estimated_energy_demand: float | None = None  # energy demand in joule
     covered_distance: float | None = None  # covered distance in metres
+    profile: TripProfile | None = None
 
     def download_geometry(
         self,
