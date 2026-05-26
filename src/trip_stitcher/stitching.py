@@ -136,8 +136,8 @@ def build_default_is_stitchable(
     Additional constraints are included depending on the provided arguments.
 
     Args:
-        minimum_timedelta: Minimum time gap required between the end of the
-            first driving mission and the start of the second.
+        minimum_timedelta: Minimum time gap that must exist between the end of the
+            first driving mission and the start of the second for them to be stitchable.
         route_dict: Optional mapping used to enforce vehicle compatibility
             between driving missions.
 
@@ -148,7 +148,7 @@ def build_default_is_stitchable(
 
     def timedelta_check(first_dm: DrivingMission, second_dm: DrivingMission) -> bool:
         assert first_dm.end_time is not None
-        assert second_dm.trips[0].arrival_times is not None and len(second_dm.trips) > 0
+        assert len(second_dm.trips) > 0 and second_dm.trips[0].arrival_times is not None
         dt = str_to_datetime(second_dm.trips[0].arrival_times[0]) - first_dm.end_time
         return dt >= minimum_timedelta
 
