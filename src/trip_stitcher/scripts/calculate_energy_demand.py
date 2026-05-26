@@ -1,3 +1,22 @@
+# calculate_energy_demand.py
+#
+# Pipeline script that reads Trip objects from a JSONL input stream, estimates
+# the energy demand for each trip using the EnergyDemandEstimator, and writes
+# the annotated Trip objects to a JSONL output stream.
+#
+# The script relies on a pre-built elevation/speed Parquet data file and the
+# trip_stitcher pipeline infrastructure (get_default_parser / run_pipeline).
+#
+# Usage:
+#   python calculate_energy_demand.py --data-file FILE
+#                                     [--bus-type {mini,maxi,mega}]
+#                                     [--input FILE] [--output FILE] [--debug]
+#
+# Arguments:
+#   --data-file   Path to the Parquet file used by EnergyDemandEstimator
+#   --bus-type    Vehicle type to use for the simulation (default: maxi)
+#   --debug       Enable verbose DEBUG-level logging
+
 from functools import partial
 
 import pandas as pd

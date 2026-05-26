@@ -7,7 +7,7 @@ from ocsept.models.components.vehicles import BatteryBus
 chassis = Chassis(
     length="5.94m",
     weight="2.7t",
-    gvm="4.5t",
+    gvm="10t",
     aerodynamic_drag_area="2.5m^2",
     rolling_friction=0.01,
     wheel_inertia=[(4, "8kg*m^2")],
@@ -30,13 +30,15 @@ powertrain = ElectricPowertrain(
     final_drive_transmission_ratio=9.5,
 )
 battery = Battery(
-    weight="800kg",
-    chemistry=BatteryChemistry.LFP,
-    capacity="100kWh",
-    c_rate_limit_continuous_charging="2/h",
-    c_rate_limit_continuous_discharging="2/h",
-    c_rate_limit_peak_charging="3/h",
-    c_rate_limit_peak_discharging="3/h",
+    weight="1078kg",
+    chemistry=BatteryChemistry.NMC,
+    capacity="154kWh",
+    c_rate_limit_continuous_charging="1/h",
+    c_rate_limit_continuous_discharging="1/h",
+    c_rate_limit_peak_charging="2/h",
+    c_rate_limit_peak_discharging="2/h",
+    soc_min=0.2,
+    soc_max=0.8,
 )
 
 bus = BatteryBus(chassis=chassis, powertrain=powertrain, battery=battery)

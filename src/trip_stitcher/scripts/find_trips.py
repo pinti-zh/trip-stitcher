@@ -1,3 +1,20 @@
+# find_trips.py
+#
+# Pipeline script that reads RadiusQuery objects from a JSONL input stream,
+# searches the RouteLocator for all routes and trips within the specified
+# radius, and writes the matching Trip objects (sorted by first arrival time)
+# to a JSONL output stream.
+#
+# The RouteLocator index is built once at startup from a Parquet data file.
+#
+# Usage:
+#   python find_trips.py --data-file FILE
+#                        [--input FILE] [--output FILE] [--debug]
+#
+# Arguments:
+#   --data-file   Path to the Parquet file containing route/trip/stop data
+#   --debug       Enable verbose DEBUG-level logging
+
 from functools import partial
 from time import perf_counter
 
@@ -20,7 +37,7 @@ def find_trips(
     if df is None:
         raise ValueError("df must be provided")
 
-    routes = route_locator.radius_query(radius_query)
+    routes, _ = route_locator.radius_query(radius_query)
     logger.debug(
         f"{len(routes)} routes found within {radius_query.radius} meters of ({radius_query.lat}, {radius_query.lon})"
     )
