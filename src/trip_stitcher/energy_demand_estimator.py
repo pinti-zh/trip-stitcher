@@ -223,9 +223,10 @@ class EnergyDemandEstimator:
 
         comfort = RidingComfort()
 
-        speed_profile = self._compute_speed_profile(
-            itinerary, bus, comfort, payload=payload, aux_power=aux_power
-        )
+        with suppress_stdout():
+            speed_profile = self._compute_speed_profile(
+                itinerary, bus, comfort, payload=payload, aux_power=aux_power
+            )
 
         assert speed_profile.distance is not None
         assert speed_profile.speed is not None
