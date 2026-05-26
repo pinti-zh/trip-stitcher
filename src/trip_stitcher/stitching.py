@@ -32,10 +32,8 @@ def driving_mission_and_trip_match_vehicles(
 
 
 def driving_missions_match_vehicles(
-    first_dm: DrivingMission, second_dm: DrivingMission, route_dict: dict[str, Route] | None = None
+    first_dm: DrivingMission, second_dm: DrivingMission, route_dict: dict[str, Route]
 ) -> bool:
-    if route_dict is None:
-        raise ValueError("route_dict must not be None")
     return (
         route_dict[first_dm.trips[-1].route].vehicle_type
         == route_dict[second_dm.trips[0].route].vehicle_type
@@ -123,6 +121,17 @@ def build_default_is_addable(
     return is_addable
 
 
+def has_minimum_time_difference(
+    first_dm: DrivingMission,
+    second_dm: DrivingMission,
+    minimum_timedelta: timedelta = timedelta(hours=4),
+) -> bool:
+    assert first_dm.end_time is not None
+    assert len(second_dm.trips) > 0 and second_dm.trips[0].arrival_times is not None
+    dt = str_to_datetime(second_dm.trips[0].arrival_times[0]) - first_dm.end_time
+    return dt >= minimum_timedelta
+
+
 def build_default_is_stitchable(
     minimum_timedelta: timedelta = timedelta(hours=4),
     route_dict: dict[str, Route] | None = None,
@@ -133,26 +142,17 @@ def build_default_is_stitchable(
 
     The returned function evaluates a set of conditions that must all be met
     for a (DrivingMission, DrivingMission) pair to be considered compatible.
-    Additional constraints are included depending on the provided arguments.
 
     Args:
         minimum_timedelta: Minimum time gap that must exist between the end of the
             first driving mission and the start of the second for them to be stitchable.
         route_dict: Optional mapping used to enforce vehicle compatibility
             between driving missions.
-
-    Returns:
-        A callable that takes two DrivingMissions and returns True if all
-        configured conditions are satisfied, otherwise False.
     """
 
-    def timedelta_check(first_dm: DrivingMission, second_dm: DrivingMission) -> bool:
-        assert first_dm.end_time is not None
-        assert len(second_dm.trips) > 0 and second_dm.trips[0].arrival_times is not None
-        dt = str_to_datetime(second_dm.trips[0].arrival_times[0]) - first_dm.end_time
-        return dt >= minimum_timedelta
-
-    predicates: list[Callable[[DrivingMission, DrivingMission], bool]] = [timedelta_check]
+    predicates: list[Callable[[DrivingMission, DrivingMission], bool]] = [
+        partial(has_minimum_time_difference, minimum_timedelta=minimum_timedelta)
+    ]
 
     if route_dict is not None:
         predicates.append(partial(driving_missions_match_vehicles, route_dict=route_dict))
