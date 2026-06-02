@@ -15,6 +15,7 @@ TABLES = [
     "stops",
     "calendar",
     "calendar_dates",
+    "transfers",
 ]
 
 
