@@ -165,6 +165,22 @@ def main():
                     f"filtered calendar_dates: {len(rows_calendar_dates_filtered)}/{calendar_dates_row_count} row(s) remaining"
                 )
 
+                # 8. Filter 'transfers' based on stop_ids used in filtered stops
+                transfers_row_count = src_conn.execute(
+                    text("SELECT COUNT(*) FROM transfers")
+                ).scalar()
+                q_transfers = text(
+                    "SELECT * FROM transfers WHERE (from_stop_id IN :stop_ids) OR (to_stop_id IN :stop_ids)"
+                ).bindparams(bindparam("stop_ids", expanding=True))
+                rows_transfers_filtered = src_conn.execute(
+                    q_transfers,
+                    {"stop_ids": list(set(row.stop_id for row in rows_stops_filtered))},
+                ).fetchall()
+
+                logger.debug(
+                    f"filtered transfers: {len(rows_transfers_filtered)}/{transfers_row_count} row(s) remaining"
+                )
+
                 # Insert filtered data into the destination database
                 dst_conn.execute(
                     metadata.tables["agency"].insert(),
