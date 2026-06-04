@@ -170,7 +170,7 @@ def main():
                     text("SELECT COUNT(*) FROM transfers")
                 ).scalar()
                 q_transfers = text(
-                    "SELECT * FROM transfers WHERE (from_stop_id IN :stop_ids) OR (to_stop_id IN :stop_ids)"
+                    "SELECT * FROM transfers WHERE (from_stop_id IN :stop_ids) AND (to_stop_id IN :stop_ids)"
                 ).bindparams(bindparam("stop_ids", expanding=True))
                 rows_transfers_filtered = src_conn.execute(
                     q_transfers,
@@ -209,6 +209,10 @@ def main():
                 dst_conn.execute(
                     metadata.tables["calendar_dates"].insert(),
                     [row._asdict() for row in rows_calendar_dates_filtered],
+                )
+                dst_conn.execute(
+                    metadata.tables["transfers"].insert(),
+                    [row._asdict() for row in rows_transfers_filtered],
                 )
                 logger.info(f"written filtered data to {args.output_db}")
 
