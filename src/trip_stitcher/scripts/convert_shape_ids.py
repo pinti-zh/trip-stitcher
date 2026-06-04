@@ -35,6 +35,7 @@ def main():
     logger.debug(f"loaded trips ({len(trips)} rows)")
 
     id_map: dict[str, set[str]] = {}  # maps each shape_id to a set of partial trip_ids
+    new_shape_ids = []
     for trip_id, shape_id in zip(trips["trip_id"], trips["shape_id"]):
         split_trip_id = trip_id.split(".")
         assert len(split_trip_id) == 5
@@ -43,6 +44,7 @@ def main():
             id_map[shape_id] = {partial_trip_id}
         else:
             id_map[shape_id].add(partial_trip_id)
+        new_shape_ids.append(partial_trip_id)
 
     assert all(shape_id in id_map.keys() for shape_id in shapes["shape_id"])
 
@@ -57,6 +59,10 @@ def main():
 
     shapes.to_csv(args.gtfs_dir / "shapes.txt", index=False)
     logger.info(f"written shapes to '{args.gtfs_dir / 'shapes.txt'}'")
+    
+    trips["shape_id"] = new_shape_ids
+    trips.to_csv(args.gtfs_dir / "trips.txt", index=False)
+    logger.info(f"written trips to '{args.gtfs_dir / 'trips.txt'}'")
 
 
 if __name__ == "__main__":
