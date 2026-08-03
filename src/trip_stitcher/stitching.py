@@ -8,9 +8,6 @@ from scipy.sparse.csgraph import maximum_bipartite_matching
 
 from trip_stitcher.models import DrivingMission, Route, Stop, Trip
 from trip_stitcher.utils import datetime_to_str, str_to_datetime
-from trip_stitcher.vehicle_specs import build_vehicle_capacity_map
-
-DEFAULT_VEHICLE_CAPACITY_MAP: dict[str, float] = build_vehicle_capacity_map()
 
 
 def driving_mission_and_trip_match_vehicles(
@@ -79,9 +76,7 @@ def build_default_is_addable(
             between driving missions and trips, and to look up vehicle type
             for energy capacity checks.
         vehicle_capacity_map: Mapping from vehicle type string to usable energy
-            capacity in joules. Defaults to DEFAULT_VEHICLE_CAPACITY_MAP when
-            route_dict is provided. Supply a custom map to support additional
-            vehicle types beyond the built-in maxi/mega/mini.
+            capacity in joules. Required when route_dict is provided.
 
     Returns:
         A callable that takes a DrivingMission and a Trip and returns True
@@ -94,17 +89,14 @@ def build_default_is_addable(
     ]
 
     if route_dict is not None:
-        cap_map = (
-            vehicle_capacity_map
-            if vehicle_capacity_map is not None
-            else DEFAULT_VEHICLE_CAPACITY_MAP
-        )
+        if vehicle_capacity_map is None:
+            raise ValueError("vehicle_capacity_map must be provided when route_dict is provided")
         predicates.append(partial(driving_mission_and_trip_match_vehicles, route_dict=route_dict))
         predicates.append(
             partial(
                 trip_within_vehicle_energy_capacity,
                 route_dict=route_dict,
-                vehicle_capacity_map=cap_map,
+                vehicle_capacity_map=vehicle_capacity_map,
             )
         )
 
