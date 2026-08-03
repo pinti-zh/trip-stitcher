@@ -8,16 +8,9 @@ from scipy.sparse.csgraph import maximum_bipartite_matching
 
 from trip_stitcher.models import DrivingMission, Route, Stop, Trip
 from trip_stitcher.utils import datetime_to_str, str_to_datetime
-from trip_stitcher.vehicles import maxi, mega, mini
+from trip_stitcher.vehicle_specs import build_vehicle_capacity_map
 
-DEFAULT_VEHICLE_CAPACITY_MAP: dict[str, float] = {
-    "maxi": maxi.bus.battery.capacity.m_as("J")
-    * (maxi.bus.battery.soc_max - maxi.bus.battery.soc_min),
-    "mega": mega.bus.battery.capacity.m_as("J")
-    * (mega.bus.battery.soc_max - mega.bus.battery.soc_min),
-    "mini": mini.bus.battery.capacity.m_as("J")
-    * (mini.bus.battery.soc_max - mini.bus.battery.soc_min),
-}
+DEFAULT_VEHICLE_CAPACITY_MAP: dict[str, float] = build_vehicle_capacity_map()
 
 
 def driving_mission_and_trip_match_vehicles(
