@@ -10,7 +10,7 @@ from optool.uom import Quantity
 from trip_stitcher.elevation import ElevationOracle
 from trip_stitcher.models import RouteProfile, Stop, Trip, TripProfile
 from trip_stitcher.utils import str_to_datetime, suppress_stdout
-from trip_stitcher.vehicles import maxi, mega, mini
+from trip_stitcher.vehicle_specs import VehicleSpec, build_battery_bus
 
 
 class _CasadiStrategyTag:
@@ -26,9 +26,7 @@ class EnergyDemandEstimator:
             (stop.id, stop) for stop in Stop.list_from_dataframe(df)
         )
         self.elevation_oracle = ElevationOracle()
-        self.cache: dict[
-            tuple[str, ...], tuple[float, float, TripProfile]
-        ] = {}  # (energy, distance, profile)
+        self.cache: dict[tuple[object, ...], tuple[float, float, TripProfile]] = {}
 
     @staticmethod
     def _compute_speed_profile(
@@ -182,9 +180,15 @@ class EnergyDemandEstimator:
         )
 
     def calculate_energy_demand(
-        self, trip: Trip, bus_type: str | None = None, aux_power: float = 0.0, payload: float = 0.0
+        self,
+        trip: Trip,
+        aux_power: float = 0.0,
+        vehicle: VehicleSpec | None = None,
     ) -> float:
-        cache_key = tuple(trip.stops + [str(aux_power), str(bus_type), str(payload)])
+        if vehicle is None:
+            raise ValueError("vehicle must not be None")
+
+        cache_key = tuple(trip.stops) + (aux_power, vehicle)
         if cache_key in self.cache:
             energy, distance, profile = self.cache[cache_key]
             trip.estimated_energy_demand = energy
@@ -208,24 +212,17 @@ class EnergyDemandEstimator:
         assert max_inclination < 20
 
         itinerary = RouteProfile.from_trip_geometry(trip_geometry)
-
-        bus = None
-        match bus_type:
-            case "mini":
-                bus = mini.bus
-            case "maxi":
-                bus = maxi.bus
-            case "mega":
-                bus = mega.bus
-            case _:
-                raise ValueError(f"Unknown bus type: {bus_type}")
-        assert bus is not None
+        bus = build_battery_bus(vehicle)
 
         comfort = RidingComfort()
 
         with suppress_stdout():
             speed_profile = self._compute_speed_profile(
-                itinerary, bus, comfort, payload=payload, aux_power=aux_power
+                itinerary,
+                bus,
+                comfort,
+                payload=vehicle.passenger_payload_kg,
+                aux_power=aux_power,
             )
 
         assert speed_profile.distance is not None
@@ -239,7 +236,7 @@ class EnergyDemandEstimator:
             inclination=Quantity(
                 itinerary.get_inclination(speed_profile.distance.m_as("m")), "rad"
             ),
-            payload=f"{payload} kg",
+            payload=f"{vehicle.passenger_payload_kg} kg",
         )
 
         with suppress_stdout():
